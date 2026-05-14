@@ -1,15 +1,17 @@
-# Employee Feedback Management System
+# Employee Engagement Platform
 
-A full-stack AI-powered employee feedback management system with a sleek, professional interface.
+A comprehensive full-stack AI-powered employee engagement platform with feedback management, AI chatbot interactions, and admin oversight for fostering workplace communication and satisfaction.
 
 ## Features
 
-- **Employee Dashboard**: Submit feedback, view submissions and responses
-- **Admin Dashboard**: Manage all feedback, generate AI responses, approve replies
-- **AI Integration**: OpenAI-powered professional response generation
-- **Role-based Access**: Secure authentication with JWT
-- **Real-time Analytics**: Dashboard with feedback statistics
-- **Professional UI**: Enterprise-grade design with Tailwind CSS
+- **Employee Dashboard**: Submit feedback, engage with AI chatbot, view chat sessions and feedback responses
+- **Admin Dashboard**: Manage feedback, oversee chat sessions, generate AI responses, approve replies, and monitor engagement metrics
+- **AI Integration**: OpenAI-powered chatbot for employee queries and professional response generation for feedback
+- **Chat System**: Real-time AI chatbot interactions with session management and escalation to HR
+- **Feedback Management**: AI-enhanced feedback forms with question generation and refinement
+- **Role-based Access**: Secure authentication with JWT for employees and admins
+- **Real-time Analytics**: Dashboard with feedback statistics, chat session metrics, and engagement insights
+- **Professional UI**: Enterprise-grade design with Tailwind CSS and responsive components
 
 ## Tech Stack
 
@@ -41,7 +43,7 @@ A full-stack AI-powered employee feedback management system with a sleek, profes
 
 3. Create a `.env` file in the backend directory:
    ```env
-   MONGODB_URI=mongodb://localhost:27017/employee-feedback
+   MONGODB_URI=mongodb://localhost:27017/employee-engagement
    JWT_SECRET=your-super-secret-jwt-key-here
    JWT_EXPIRE=7d
    FRONTEND_URL=http://localhost:5173
