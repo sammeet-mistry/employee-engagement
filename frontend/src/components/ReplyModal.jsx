@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useDispatch } from 'react-redux';
 import axios from '../utils/axios';
+import { formatFullDateTime } from '../utils/date';
 
 const ReplyModal = ({ feedback, onClose, onGenerateAI, onApproveReply }) => {
   const [replies, setReplies] = useState([]);
@@ -110,7 +110,7 @@ const ReplyModal = ({ feedback, onClose, onGenerateAI, onApproveReply }) => {
                       {reply.sentToEmployee && <span className="bg-primary-500 text-white px-2 py-1 rounded text-xs">Sent</span>}
                     </div>
                     <div className="text-xs text-secondary-400">
-                      {new Date(reply.createdAt).toLocaleString()}
+                      {formatFullDateTime(reply.createdAt)}
                     </div>
                   </div>
 

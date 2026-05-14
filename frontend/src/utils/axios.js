@@ -1,10 +1,11 @@
 import axios from 'axios';
 
-// Configure axios defaults
-// axios.defaults.baseURL = 'http://localhost:5000'; // Remove this to use Vite proxy
+const apiClient = axios.create({
+  baseURL: 'http://localhost:5002',
+});
 
 // Add request interceptor to include auth token
-axios.interceptors.request.use(
+apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
@@ -18,7 +19,7 @@ axios.interceptors.request.use(
 );
 
 // Add response interceptor to handle auth errors
-axios.interceptors.response.use(
+apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
@@ -29,4 +30,4 @@ axios.interceptors.response.use(
   }
 );
 
-export default axios;
+export default apiClient;

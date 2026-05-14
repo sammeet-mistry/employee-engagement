@@ -1,17 +1,19 @@
 import LoadingSpinner from './LoadingSpinner';
+import { formatFullDateTime } from '../utils/date';
 
 const FeedbackList = ({ feedback, loading, error, showReplies = false }) => {
   if (loading) return <LoadingSpinner />;
   if (error) return <div className="text-error">{error}</div>;
   if (!feedback || feedback.length === 0) {
-    return <div className="text-secondary-500 text-center py-8">No feedback found.</div>;
+    return <div className="text-secondary-500 text-center py-8">Your personalized feedback timeline is empty. Submit feedback or use the AI questionnaire to create a structured entry, and the system will auto-generate an acknowledgement for every submission.</div>;
   }
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'Pending': return 'bg-warning text-white';
+      case 'Pending': return 'bg-secondary-300 text-secondary-900';
       case 'Under Review': return 'bg-primary-500 text-white';
       case 'AI Draft Generated': return 'bg-accent text-white';
+      case 'AI Auto Responded': return 'bg-success text-white';
       case 'Responded': return 'bg-success text-white';
       case 'Resolved': return 'bg-secondary-500 text-white';
       default: return 'bg-secondary-300 text-secondary-700';
@@ -21,8 +23,8 @@ const FeedbackList = ({ feedback, loading, error, showReplies = false }) => {
   const getPriorityColor = (priority) => {
     switch (priority) {
       case 'Low': return 'text-secondary-600';
-      case 'Medium': return 'text-warning';
-      case 'High': return 'text-error';
+      case 'Medium': return 'text-primary-600';
+      case 'High': return 'text-accent-600';
       case 'Urgent': return 'text-error font-bold';
       default: return 'text-secondary-600';
     }
@@ -49,7 +51,7 @@ const FeedbackList = ({ feedback, loading, error, showReplies = false }) => {
           <div className="flex flex-wrap gap-2 text-sm text-secondary-500 mb-2">
             <span>Category: {item.category}</span>
             {item.department && <span>Department: {item.department}</span>}
-            <span>Submitted: {new Date(item.createdAt).toLocaleDateString()}</span>
+            <span>Submitted: {formatFullDateTime(item.createdAt)}</span>
           </div>
 
           {showReplies && item.reply && (
@@ -58,7 +60,7 @@ const FeedbackList = ({ feedback, loading, error, showReplies = false }) => {
               <p className="text-secondary-700">{item.reply}</p>
               {item.replyDate && (
                 <p className="text-xs text-secondary-500 mt-2">
-                  Responded on {new Date(item.replyDate).toLocaleDateString()}
+                  Responded on {formatFullDateTime(item.replyDate)}
                 </p>
               )}
             </div>

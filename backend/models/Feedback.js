@@ -32,7 +32,7 @@ const feedbackSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Pending', 'Under Review', 'AI Draft Generated', 'Responded', 'Resolved'],
+    enum: ['Pending', 'Under Review', 'AI Draft Generated', 'AI Auto Responded', 'Responded', 'Resolved'],
     default: 'Pending'
   },
   sentiment: {
@@ -44,10 +44,26 @@ const feedbackSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  aiSummary: {
+    type: String,
+    trim: true
+  },
+  aiSummaryCategory: {
+    type: String,
+    trim: true
+  },
+  aiSummaryTags: {
+    type: [String],
+    default: []
+  },
   submittedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
+  },
+  chatSession: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ChatSession'
   }
 }, {
   timestamps: true

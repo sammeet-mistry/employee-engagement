@@ -11,6 +11,7 @@ import {
 import StatsCards from '../components/StatsCards';
 import FeedbackTable from '../components/FeedbackTable';
 import FeedbackFilters from '../components/FeedbackFilters';
+import AdminChatSessions from '../components/AdminChatSessions';
 
 const AdminDashboard = () => {
   const [filters, setFilters] = useState({});
@@ -74,6 +75,12 @@ const AdminDashboard = () => {
           onGenerateAI={handleGenerateAI}
           onApproveReply={handleApproveReply}
         />
+      </div>
+
+      <div className="card">
+        <h2 className="text-xl font-semibold text-secondary-900 mb-4">Employee Chat Sessions</h2>
+        <p className="text-secondary-600 mb-5">Access and manage employee HR chatbot conversations directly from the admin dashboard.</p>
+        <AdminChatSessions />
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import LoadingSpinner from './LoadingSpinner';
 import ReplyModal from './ReplyModal';
+import { formatFullDateTime } from '../utils/date';
 
 const FeedbackTable = ({
   feedback,
@@ -22,9 +23,10 @@ const FeedbackTable = ({
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'Pending': return 'bg-warning text-white';
+      case 'Pending': return 'bg-secondary-300 text-secondary-900';
       case 'Under Review': return 'bg-primary-500 text-white';
       case 'AI Draft Generated': return 'bg-accent text-white';
+      case 'AI Auto Responded': return 'bg-success text-white';
       case 'Responded': return 'bg-success text-white';
       case 'Resolved': return 'bg-secondary-500 text-white';
       default: return 'bg-secondary-300 text-secondary-700';
@@ -47,6 +49,9 @@ const FeedbackTable = ({
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
                 Category
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
+                Summary
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
                 Priority
@@ -75,12 +80,15 @@ const FeedbackTable = ({
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
-                  {fb.category}
+                  {fb.aiSummaryCategory || fb.category}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500 max-w-xs truncate">
+                  {fb.aiSummary ? fb.aiSummary : fb.description}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                     fb.priority === 'Urgent' ? 'bg-error text-white' :
-                    fb.priority === 'High' ? 'bg-warning text-white' :
+                    fb.priority === 'High' ? 'bg-accent-500 text-white' :
                     fb.priority === 'Medium' ? 'bg-primary-100 text-primary-800' :
                     'bg-secondary-100 text-secondary-800'
                   }`}>
@@ -96,7 +104,7 @@ const FeedbackTable = ({
                   {fb.anonymous ? 'Anonymous' : fb.submittedBy?.name || 'Unknown'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
-                  {new Date(fb.createdAt).toLocaleDateString()}
+                  {formatFullDateTime(fb.createdAt)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex justify-end space-x-2">
@@ -114,6 +122,7 @@ const FeedbackTable = ({
                       <option value="Pending">Pending</option>
                       <option value="Under Review">Under Review</option>
                       <option value="AI Draft Generated">AI Draft Generated</option>
+                      <option value="AI Auto Responded">AI Auto Responded</option>
                       <option value="Responded">Responded</option>
                       <option value="Resolved">Resolved</option>
                     </select>

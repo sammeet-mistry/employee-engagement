@@ -100,6 +100,7 @@ const FeedbackFilters = ({ onFilterChange }) => {
             <option value="Pending">Pending</option>
             <option value="Under Review">Under Review</option>
             <option value="AI Draft Generated">AI Draft Generated</option>
+            <option value="AI Auto Responded">AI Auto Responded</option>
             <option value="Responded">Responded</option>
             <option value="Resolved">Resolved</option>
           </select>
