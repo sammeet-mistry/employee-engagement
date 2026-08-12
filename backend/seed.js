@@ -9,14 +9,11 @@ const seedAdmin = async () => {
       useUnifiedTopology: true
     });
     
-    // Check if admin already exists
+    // Delete existing admin user if it exists
     const adminExists = await User.findOne({ email: "admin@company.com" });
     if (adminExists) {
-      console.log("? Admin user already exists");
-      console.log("Email: admin@company.com");
-      console.log("Password: Admin@123");
-      mongoose.connection.close();
-      return;
+      await User.deleteOne({ email: "admin@company.com" });
+      console.log("? Existing admin user deleted");
     }
 
     // Create admin user
