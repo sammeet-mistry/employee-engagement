@@ -7,6 +7,7 @@ const ReplyModal = ({ feedback, onClose, onGenerateAI, onApproveReply }) => {
   const [loading, setLoading] = useState(false);
   const [editingReply, setEditingReply] = useState('');
   const [selectedReplyId, setSelectedReplyId] = useState(null);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     fetchReplies();
@@ -23,11 +24,13 @@ const ReplyModal = ({ feedback, onClose, onGenerateAI, onApproveReply }) => {
 
   const handleGenerateAI = async () => {
     setLoading(true);
+    setErrorMessage('');
     try {
       await onGenerateAI(feedback._id);
       await fetchReplies();
     } catch (error) {
       console.error('Error generating AI reply:', error);
+      setErrorMessage(error.message || 'Unable to generate a reply. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -75,6 +78,32 @@ const ReplyModal = ({ feedback, onClose, onGenerateAI, onApproveReply }) => {
                   {feedback.status}
                 </span>
               </div>
+              {(feedback.aiSummary || feedback.mood) && (
+                <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+                  <div className="rounded-lg border border-secondary-200 bg-secondary-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-secondary-500">AI summary</p>
+                    <p className="mt-1 text-sm text-secondary-700">{feedback.aiSummary || 'Summary not available.'}</p>
+                  </div>
+                  <div className="rounded-lg border border-secondary-200 bg-secondary-50 p-3 sm:min-w-48">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-secondary-500">Employee mood</p>
+                    <p className="mt-1 text-sm font-medium text-secondary-800">{feedback.mood || 'Not assessed'}</p>
+                    {typeof feedback.moodScore === 'number' && <p className="mt-1 text-xs text-secondary-500">Signal: {feedback.moodScore.toFixed(2)}</p>}
+                  </div>
+                </div>
+              )}
+              {feedback.questionAnswers && Object.keys(feedback.questionAnswers).length > 0 && (
+                <div className="mt-4 rounded-lg border border-secondary-200 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-secondary-500">Questionnaire responses ({feedback.questionCount || Object.keys(feedback.questionAnswers).length})</p>
+                  <div className="mt-3 space-y-3">
+                    {Object.entries(feedback.questionAnswers).map(([question, answer]) => (
+                      <div key={question}>
+                        <p className="text-sm font-medium text-secondary-800">{question}</p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-secondary-600">{answer || 'No answer provided.'}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <button
               onClick={onClose}
@@ -94,6 +123,11 @@ const ReplyModal = ({ feedback, onClose, onGenerateAI, onApproveReply }) => {
             >
               {loading ? 'Generating...' : 'Generate AI Reply'}
             </button>
+            {errorMessage && (
+              <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {errorMessage}
+              </p>
+            )}
           </div>
 
           <div className="space-y-4">

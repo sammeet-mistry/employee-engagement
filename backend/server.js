@@ -1,4 +1,6 @@
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -8,6 +10,15 @@ const mongoSanitize = require('express-mongo-sanitize');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
 const app = express();
+const httpServer = http.createServer(app);
+const io = new Server(httpServer, {
+  cors: { origin: process.env.FRONTEND_URL || ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'] }
+});
+app.set('io', io);
+io.on('connection', (socket) => {
+  console.log(`Realtime client connected: ${socket.id}`);
+  socket.on('disconnect', () => console.log(`Realtime client disconnected: ${socket.id}`));
+});
 
 // Security middleware
 app.use(helmet());
@@ -62,6 +73,6 @@ mongoose.connect(mongoUri, {
 .catch(err => console.error('MongoDB connection error:', err));
 
 const PORT = process.env.PORT || 5002;
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

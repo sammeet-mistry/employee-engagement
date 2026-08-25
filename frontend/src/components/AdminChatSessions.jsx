@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from '../utils/axios';
 import { formatFullDateTime } from '../utils/date';
+import socket from '../utils/socket';
 
 const AdminChatSessions = () => {
   const [sessions, setSessions] = useState([]);
@@ -11,6 +12,10 @@ const AdminChatSessions = () => {
 
   useEffect(() => {
     fetchSessions();
+    socket.connect();
+    const refreshSessions = () => fetchSessions();
+    socket.on('chat:session-updated', refreshSessions);
+    return () => socket.off('chat:session-updated', refreshSessions);
   }, []);
 
   const fetchSessions = async () => {

@@ -5,6 +5,12 @@
 @layer base {
   html {
     font-family: 'Inter', system-ui, sans-serif;
+    overflow-x: hidden;
+  }
+
+  body {
+    min-width: 320px;
+    overflow-x: hidden;
   }
 }
 
@@ -18,7 +24,7 @@
   }
   
   .card {
-    @apply bg-white rounded-lg shadow-sm border border-secondary-200 p-6;
+    @apply bg-white rounded-lg shadow-sm border border-secondary-300 p-4 sm:p-6;
   }
   
   .input-field {

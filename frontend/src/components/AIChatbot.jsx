@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import axios from '../utils/axios';
 import { formatFullDateTime } from '../utils/date';
+import socket from '../utils/socket';
 
 const ChatbotAssistant = () => {
   const [sessions, setSessions] = useState([]);
@@ -9,9 +10,21 @@ const ChatbotAssistant = () => {
   const [statusMessage, setStatusMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const activeSessionRef = useRef(activeSession);
+  activeSessionRef.current = activeSession;
 
   useEffect(() => {
     fetchSessions();
+    socket.connect();
+    const refreshSession = ({ sessionId }) => {
+      if (activeSessionRef.current?._id === sessionId) {
+        axios.get(`/api/chat/session/${sessionId}`).then(({ data }) => setActiveSession(data)).catch(() => {});
+      } else {
+        fetchSessions();
+      }
+    };
+    socket.on('chat:session-updated', refreshSession);
+    return () => socket.off('chat:session-updated', refreshSession);
   }, []);
 
   const fetchSessions = async () => {
@@ -113,7 +126,7 @@ const ChatbotAssistant = () => {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-lg border border-slate-300 bg-white p-5 shadow-sm">
         <h2 className="text-xl font-semibold">HR AI Chat Assistant</h2>
         <p className="mt-2 text-sm text-slate-600">
           Start a secure HR chat, preview the AI-generated draft, and optionally send it to HR or request an agent.
@@ -121,7 +134,7 @@ const ChatbotAssistant = () => {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-        <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="space-y-4 rounded-lg border border-slate-300 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-medium">Your chat sessions</h3>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">{sessions.length}</span>
@@ -150,7 +163,7 @@ const ChatbotAssistant = () => {
           </div>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-lg border border-slate-300 bg-white p-5 shadow-sm">
           {!activeSession && (
             <div className="space-y-4">
               <p className="text-slate-600">Write your first message to the HR chatbot and receive a preview before sending it to HR.</p>
@@ -181,7 +194,7 @@ const ChatbotAssistant = () => {
 
           {activeSession && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between rounded-2xl border border-slate-300 bg-slate-50 p-4">
                 <div>
                   <h3 className="text-lg font-semibold">{activeSession.title || 'HR Chat Assistant'}</h3>
                   <p className="text-sm text-slate-600">{getChatStatusLabel(activeSession.status)}</p>
@@ -189,14 +202,19 @@ const ChatbotAssistant = () => {
                 <p className="text-sm text-slate-500">Updated {formatFullDateTime(activeSession.updatedAt)}</p>
               </div>
 
-              <div className="space-y-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="space-y-3 overflow-hidden rounded-2xl border border-slate-300 bg-slate-50 p-4">
                 {activeSession.messages.map((chat, index) => (
                   <div key={`${chat.sender}-${index}`} className={`rounded-2xl p-4 ${chat.sender === 'ai' ? 'bg-indigo-50 text-slate-900' : chat.sender === 'employee' ? 'bg-white text-slate-900' : 'bg-slate-100 text-slate-700'}`}>
                     <div className="flex items-center justify-between gap-4">
-                      <span className="font-semibold text-sm capitalize">{chat.sender === 'employee' ? 'You' : chat.sender === 'ai' ? 'HR AI' : 'System'}</span>
+                      <span className="font-semibold text-sm capitalize">{chat.sender === 'employee' ? 'You' : chat.sender === 'ai' ? 'HR AI' : chat.sender === 'admin' ? 'HR Admin' : 'System'}</span>
                       <span className="text-xs text-slate-500">{formatFullDateTime(chat.createdAt)}</span>
                     </div>
                     <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{chat.text}</p>
+                    {chat.sender === 'employee' && chat.originalCategory && (
+                      <span className="mt-3 inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-600">
+                        Category: {chat.originalCategory.replace('_', ' ')}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>

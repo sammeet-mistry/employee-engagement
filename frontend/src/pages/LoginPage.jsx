@@ -14,13 +14,8 @@ const LoginPage = () => {
   const { loading, error, user } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    console.log('LoginPage useEffect - user:', user);
-    console.log('User role:', user?.role);
-    console.log('Type of user:', typeof user);
     if (user) {
-      console.log('Navigating to:', user.role === 'admin' ? '/admin' : '/employee');
       const redirectPath = user.role === 'admin' ? '/admin' : '/employee';
-      console.log('About to navigate to:', redirectPath);
       navigate(redirectPath);
     }
   }, [user, navigate]);
@@ -38,7 +33,6 @@ const LoginPage = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log('Submitting login form with:', formData);
     dispatch(login(formData));
   };
 

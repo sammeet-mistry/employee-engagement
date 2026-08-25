@@ -16,6 +16,27 @@ const chatMessageSchema = new mongoose.Schema({
     enum: ['user', 'assistant', 'system'],
     default: 'user'
   },
+  matchedScenarioId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Scenario'
+  },
+  confidenceScore: {
+    type: Number,
+    min: 0,
+    max: 1
+  },
+  wasHumanCorrected: {
+    type: Boolean,
+    default: false
+  },
+  originalCategory: {
+    type: String,
+    trim: true
+  },
+  correctedCategory: {
+    type: String,
+    trim: true
+  },
   createdAt: {
     type: Date,
     default: Date.now

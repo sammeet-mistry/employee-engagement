@@ -5,6 +5,7 @@ import FeedbackForm from '../components/FeedbackForm';
 import FeedbackList from '../components/FeedbackList';
 import AIQuestionnaire from '../components/AIQuestionnaire';
 import ChatbotAssistant from '../components/AIChatbot';
+import socket from '../utils/socket';
 
 const EmployeeDashboard = () => {
   const [showForm, setShowForm] = useState(false);
@@ -15,6 +16,13 @@ const EmployeeDashboard = () => {
 
   useEffect(() => {
     dispatch(fetchMyFeedbackWithReplies());
+  }, [dispatch]);
+
+  useEffect(() => {
+    socket.connect();
+    const refreshFeedback = () => dispatch(fetchMyFeedbackWithReplies());
+    socket.on('feedback:created', refreshFeedback);
+    return () => socket.off('feedback:created', refreshFeedback);
   }, [dispatch]);
 
   const handleSubmitFeedback = (feedbackData) => {
@@ -40,7 +48,7 @@ const EmployeeDashboard = () => {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1fr_2fr]">
-        <div className="rounded-2xl border border-secondary-200 bg-white p-6 shadow-sm">
+        <div className="rounded-2xl border border-secondary-300 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-secondary-900">Your personal insights</h2>
           <p className="text-secondary-600 mt-3">Your dashboard only shows feedback you submitted, your department context, and the AI responses tied to your work experience.</p>
           <div className="mt-5 space-y-3 text-sm text-secondary-700">
@@ -50,7 +58,7 @@ const EmployeeDashboard = () => {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-secondary-200 bg-white p-6 shadow-sm">
+        <div className="rounded-2xl border border-secondary-300 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-secondary-900">Enterprise-ready workflow</h2>
           <p className="text-secondary-600 mt-3">Designed for companies with 1,000+ employees, the AI workflow automatically acknowledges submissions and helps keep admin workload lean while preserving personalized follow-up for each contributor.</p>
           <ul className="mt-5 space-y-3 text-sm text-secondary-700">
@@ -61,26 +69,26 @@ const EmployeeDashboard = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-secondary-200 overflow-hidden">
-        <div className="flex flex-wrap sm:flex-nowrap bg-secondary-50">
+      <div className="bg-white rounded-lg shadow-sm border border-secondary-300 overflow-hidden">
+        <div className="grid grid-cols-1 bg-secondary-50 sm:grid-cols-3">
           <button
             type="button"
             onClick={() => setActiveTab('myFeedback')}
-            className={`flex-1 py-4 text-center font-semibold transition-colors ${activeTab === 'myFeedback' ? 'bg-white text-secondary-900' : 'text-secondary-500 hover:bg-secondary-100'}`}
+            className={`min-h-12 px-3 py-3 text-center font-semibold transition-colors ${activeTab === 'myFeedback' ? 'bg-white text-secondary-900' : 'text-secondary-500 hover:bg-secondary-100'}`}
           >
             My Feedback
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('aiQuestionnaire')}
-            className={`flex-1 py-4 text-center font-semibold transition-colors ${activeTab === 'aiQuestionnaire' ? 'bg-white text-secondary-900' : 'text-secondary-500 hover:bg-secondary-100'}`}
+            className={`min-h-12 px-3 py-3 text-center font-semibold transition-colors ${activeTab === 'aiQuestionnaire' ? 'bg-white text-secondary-900' : 'text-secondary-500 hover:bg-secondary-100'}`}
           >
             AI Questionnaire
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('aiChat')}
-            className={`flex-1 py-4 text-center font-semibold transition-colors ${activeTab === 'aiChat' ? 'bg-white text-secondary-900' : 'text-secondary-500 hover:bg-secondary-100'}`}
+            className={`min-h-12 px-3 py-3 text-center font-semibold transition-colors ${activeTab === 'aiChat' ? 'bg-white text-secondary-900' : 'text-secondary-500 hover:bg-secondary-100'}`}
           >
             AI Chat
           </button>

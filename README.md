@@ -7,6 +7,7 @@ A comprehensive full-stack AI-powered employee engagement platform with feedback
 - **Employee Dashboard**: Submit feedback, engage with AI chatbot, view chat sessions and feedback responses
 - **Admin Dashboard**: Manage feedback, oversee chat sessions, generate AI responses, approve replies, and monitor engagement metrics
 - **AI Integration**: OpenAI-powered chatbot for employee queries and professional response generation for feedback
+- **Scenario Knowledge Base**: MongoDB-backed scenario matching with local cosine-similarity fallback and an admin review queue
 - **Chat System**: Real-time AI chatbot interactions with session management and escalation to HR
 - **Feedback Management**: AI-enhanced feedback forms with question generation and refinement
 - **Role-based Access**: Secure authentication with JWT for employees and admins
@@ -48,7 +49,7 @@ A comprehensive full-stack AI-powered employee engagement platform with feedback
    JWT_EXPIRE=7d
    FRONTEND_URL=http://localhost:5173
    OPENAI_API_KEY=your-openai-api-key-here
-   PORT=5000
+   PORT=5002
    ```
 
 4. Start MongoDB locally (if not already running)
@@ -57,7 +58,7 @@ A comprehensive full-stack AI-powered employee engagement platform with feedback
    ```bash
    npm run seed
    ```
-   This creates an admin user with email `admin@company.com` and password `admin123`.
+   This creates an admin user with email `admin@company.com` and password `Admin@123`.
 
 6. Start the backend server:
    ```bash
@@ -80,6 +81,19 @@ A comprehensive full-stack AI-powered employee engagement platform with feedback
    ```bash
    npm run dev
    ```
+
+The frontend expects the backend at `http://localhost:5002`.
+
+### Admin Access
+
+The seed command creates the initial administrator:
+
+- Email: `admin@company.com`
+- Password: `Admin@123`
+- Role: `admin`
+- Department: `IT Management`
+
+To reset an existing user's password, run `npm run reset-password` from `backend` and follow the prompts. Change the seeded password before using a shared or production environment.
 
 ### Seed Admin User
 
@@ -126,6 +140,11 @@ db.users.insertOne({
 - `POST /api/admin/approve-reply/:replyId` - Approve and send reply
 - `GET /api/admin/replies/:feedbackId` - Get replies for feedback
 - `GET /api/admin/stats` - Get feedback statistics
+- `GET /api/admin/scenarios` - List knowledge-base scenarios
+- `PATCH /api/admin/scenarios/:id` - Update a scenario
+- `DELETE /api/admin/scenarios/:id` - Delete a scenario
+- `GET /api/admin/unmatched-scenarios` - Review low-confidence messages
+- `POST /api/admin/scenarios/from-unmatched/:unmatchedId` - Convert a review item into a scenario
 
 ## Security Features
 
@@ -139,7 +158,7 @@ db.users.insertOne({
 
 ## Development
 
-- Backend runs on `http://localhost:5000`
+- Backend runs on `http://localhost:5002`
 - Frontend runs on `http://localhost:5173`
 - MongoDB default port `27017`
 

@@ -1,8 +1,10 @@
 import LoadingSpinner from './LoadingSpinner';
+import ContentSkeleton from './ContentSkeleton';
+import { motion } from 'framer-motion';
 import { formatFullDateTime } from '../utils/date';
 
 const FeedbackList = ({ feedback, loading, error, showReplies = false }) => {
-  if (loading) return <LoadingSpinner />;
+  if (loading) return <ContentSkeleton variant="card" count={3} />;
   if (error) return <div className="text-error">{error}</div>;
   if (!feedback || feedback.length === 0) {
     return <div className="text-secondary-500 text-center py-8">Your personalized feedback timeline is empty. Submit feedback or use the AI questionnaire to create a structured entry, and the system will auto-generate an acknowledgement for every submission.</div>;
@@ -32,8 +34,14 @@ const FeedbackList = ({ feedback, loading, error, showReplies = false }) => {
 
   return (
     <div className="space-y-4">
-      {feedback.map((item) => (
-        <div key={item._id} className="card">
+      {feedback.map((item, index) => (
+        <motion.div
+          key={item._id}
+          className="card"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, delay: index * 0.05 }}
+        >
           <div className="flex justify-between items-start mb-2">
             <h3 className="text-lg font-semibold text-secondary-900">{item.title}</h3>
             <div className="flex space-x-2">
@@ -65,7 +73,7 @@ const FeedbackList = ({ feedback, loading, error, showReplies = false }) => {
               )}
             </div>
           )}
-        </div>
+        </motion.div>
       ))}
     </div>
   );

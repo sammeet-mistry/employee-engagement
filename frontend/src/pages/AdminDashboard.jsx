@@ -12,6 +12,7 @@ import StatsCards from '../components/StatsCards';
 import FeedbackTable from '../components/FeedbackTable';
 import FeedbackFilters from '../components/FeedbackFilters';
 import AdminChatSessions from '../components/AdminChatSessions';
+import socket from '../utils/socket';
 
 const AdminDashboard = () => {
   const [filters, setFilters] = useState({});
@@ -22,6 +23,16 @@ const AdminDashboard = () => {
     dispatch(fetchFeedbackStats());
     dispatch(fetchAllFeedback());
   }, [dispatch]);
+
+  useEffect(() => {
+    socket.connect();
+    const refreshFeedback = () => {
+      dispatch(fetchAllFeedback(filters));
+      dispatch(fetchFeedbackStats());
+    };
+    socket.on('feedback:created', refreshFeedback);
+    return () => socket.off('feedback:created', refreshFeedback);
+  }, [dispatch, filters]);
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
@@ -45,7 +56,7 @@ const AdminDashboard = () => {
   };
 
   const handleGenerateAI = (feedbackId) => {
-    dispatch(generateAIReply(feedbackId)).then(() => {
+    return dispatch(generateAIReply(feedbackId)).unwrap().then(() => {
       dispatch(fetchAllFeedback(filters));
     });
   };
@@ -60,6 +71,10 @@ const AdminDashboard = () => {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-secondary-900">Admin Dashboard</h1>
+
+      <div className="rounded-lg border border-secondary-200 bg-white p-4 text-sm text-secondary-600">
+        <span className="font-medium text-secondary-900">Review lineage:</span> incoming employee feedback appears here first; low-confidence items move to the Review Queue, and approved items become Knowledge Base scenarios.
+      </div>
 
       <StatsCards stats={stats} />
 

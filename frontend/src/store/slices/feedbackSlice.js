@@ -11,7 +11,7 @@ export const submitFeedback = createAsyncThunk(
       const response = await axios.post(API_URL, feedbackData);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response.data.message);
+      return rejectWithValue(error.response?.data?.message || error.message || 'Unable to generate an AI reply.');
     }
   }
 );
@@ -84,7 +84,7 @@ export const generateAIReply = createAsyncThunk(
       const response = await axios.post(`${ADMIN_URL}/generate-ai-reply/${feedbackId}`, {});
       return { feedbackId, ...response.data };
     } catch (error) {
-      return rejectWithValue(error.response.data.message);
+      return rejectWithValue(error.response?.data?.message || error.message || 'Unable to generate an AI reply.');
     }
   }
 );

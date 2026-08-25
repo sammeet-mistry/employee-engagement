@@ -56,6 +56,24 @@ const feedbackSchema = new mongoose.Schema({
     type: [String],
     default: []
   },
+  questionAnswers: {
+    type: Map,
+    of: String,
+    default: {}
+  },
+  questionCount: {
+    type: Number,
+    default: 0
+  },
+  mood: {
+    type: String,
+    trim: true
+  },
+  moodScore: {
+    type: Number,
+    min: -1,
+    max: 1
+  },
   submittedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

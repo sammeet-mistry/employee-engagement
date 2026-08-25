@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const apiClient = axios.create({
-  baseURL: 'http://localhost:5002',
+  baseURL: import.meta.env.VITE_API_URL || '/',
 });
 
 // Add request interceptor to include auth token

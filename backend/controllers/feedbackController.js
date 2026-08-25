@@ -8,6 +8,7 @@ const {
   summarizeQuestionnaire
 } = require("../services/aiService");
 const { validationResult } = require("express-validator");
+const { categorizeMessage } = require('../services/scenarioService');
 
 exports.submitFeedback = async (req, res) => {
   const errors = validationResult(req);
@@ -41,13 +42,28 @@ exports.submitFeedback = async (req, res) => {
       aiSummary: aiSummaryResult.aiSummary,
       aiSummaryCategory: aiSummaryResult.aiSummaryCategory,
       aiSummaryTags: aiSummaryResult.aiSummaryTags,
+      questionAnswers,
+      questionCount: Object.keys(questionAnswers || {}).length,
+      mood: aiSummaryResult.mood,
+      moodScore: aiSummaryResult.moodScore,
       submittedBy: req.user.id
     });
 
     await feedback.save();
 
+    const scenarioResult = await categorizeMessage({
+      message: `${title}\n${description}`,
+      sourceType: 'feedback',
+      sourceId: feedback._id
+    });
+
+    if (scenarioResult.safety) {
+      feedback.priority = 'Urgent';
+      await feedback.save();
+    }
+
     try {
-      const aiReply = await generateAIReply(feedback);
+      const aiReply = await generateAIReply(feedback, scenarioResult.scenario);
       const reply = new Reply({
         feedbackId: feedback._id,
         generatedByAI: true,
@@ -62,6 +78,14 @@ exports.submitFeedback = async (req, res) => {
       await Feedback.findByIdAndUpdate(feedback._id, { status: 'AI Auto Responded' });
     } catch (autoReplyError) {
       console.error('AI Auto-Response Error:', autoReplyError);
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('feedback:created', { feedbackId: feedback._id });
+      if (scenarioResult.unmatched) {
+        io.emit('scenario:unmatched', { unmatchedId: scenarioResult.unmatched._id });
+      }
     }
 
     res.status(201).json(feedback);

@@ -7,14 +7,11 @@ export const login = createAsyncThunk(
   'auth/login',
   async ({ email, password }, { rejectWithValue }) => {
     try {
-      console.log('Making login request to:', `${API_URL}/login`, 'with:', { email, password });
       const response = await axios.post(`${API_URL}/login`, { email, password });
-      console.log('Login response:', response.data);
       localStorage.setItem('token', response.data.token);
       return response.data;
     } catch (error) {
-      console.error('Login error:', error.response?.data || error.message);
-      return rejectWithValue(error.response.data.message);
+      return rejectWithValue(error.response?.data?.message || error.message || 'Unable to sign in. Check that the backend is running.');
     }
   }
 );
@@ -27,7 +24,7 @@ export const register = createAsyncThunk(
       localStorage.setItem('token', response.data.token);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response.data.message);
+      return rejectWithValue(error.response?.data?.message || error.message || 'Unable to create your account.');
     }
   }
 );
@@ -42,7 +39,7 @@ export const getProfile = createAsyncThunk(
       });
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response.data.message);
+      return rejectWithValue(error.response?.data?.message || error.message || 'Unable to load your profile.');
     }
   }
 );
@@ -73,12 +70,9 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(login.fulfilled, (state, action) => {
-        console.log('Login fulfilled, payload:', action.payload);
-        console.log('Setting user to:', action.payload.user);
         state.loading = false;
         state.user = action.payload.user;
         state.token = action.payload.token;
-        console.log('State after login fulfilled - user:', state.user, 'token:', state.token);
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
