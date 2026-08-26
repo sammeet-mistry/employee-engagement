@@ -1,13 +1,13 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const mongoSanitize = require('express-mongo-sanitize');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+const { connectDB } = require('./utils/db');
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -62,17 +62,14 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Something went wrong!' });
 });
 
-// Connect to MongoDB
-console.log('MONGODB_URI:', process.env.MONGODB_URI);
-const mongoUri = process.env.MONGODB_URI || 'mongodb+srv://sammeetm:zuCkeV7dCPFb7xT@cluster0.nzhlggd.mongodb.net/employee-feedback?retryWrites=true&w=majority';
-mongoose.connect(mongoUri, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => console.log('MongoDB connected'))
-.catch(err => console.error('MongoDB connection error:', err));
-
 const PORT = process.env.PORT || 5002;
-httpServer.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+connectDB()
+  .then(() => {
+    httpServer.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error('Unable to start server:', error.message);
+    process.exitCode = 1;
+  });
