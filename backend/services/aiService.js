@@ -23,17 +23,29 @@ const getApiKey = () => {
   return process.env.OPENAI_API_KEY || process.env.AI_API_KEY || process.env.GEMINI_API_KEY;
 };
 
+const getProvider = () => {
+  const configuredProvider = (process.env.AI_PROVIDER || '').toLowerCase();
+  if (configuredProvider === 'gemini' || configuredProvider === 'google') return 'gemini';
+  if (configuredProvider === 'openai') return 'openai';
+  return process.env.GEMINI_API_KEY || (process.env.AI_API_KEY || '').startsWith('AIza') ? 'gemini' : 'openai';
+};
+
 const getModel = () => {
   return process.env.AI_MODEL || process.env.OPENAI_MODEL || 'gpt-4o-mini';
 };
 
 const getGeminiKey = () => {
-  if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
+  if (getProvider() === 'gemini') {
+    return process.env.GEMINI_API_KEY || process.env.AI_API_KEY || '';
+  }
   const configuredKey = process.env.OPENAI_API_KEY || process.env.AI_API_KEY || '';
   return configuredKey.startsWith('AIza') ? configuredKey : '';
 };
 
 const createAIClient = () => {
+  if (getProvider() === 'gemini') {
+    throw new Error('Gemini is selected but no Gemini API key is configured. Set GEMINI_API_KEY or AI_API_KEY.');
+  }
   const apiKey = getApiKey();
   if (!apiKey) {
     throw new Error('AI API key is not configured. Set GEMINI_API_KEY, AI_API_KEY, or OPENAI_API_KEY.');
@@ -86,7 +98,10 @@ const aiCreate = async (prompt, options = {}) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: options.temperature ?? 0.7, maxOutputTokens: options.maxTokens ?? 500 } })
     });
-    if (!response.ok) throw new Error(`Gemini request failed with status ${response.status}`);
+    if (!response.ok) {
+      const details = await response.text();
+      throw new Error(`Gemini request failed with status ${response.status}: ${details.slice(0, 300)}`);
+    }
     const data = await response.json();
     return data.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('').trim() || '';
   }
