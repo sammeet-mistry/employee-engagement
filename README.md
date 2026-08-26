@@ -6,7 +6,7 @@ A comprehensive full-stack AI-powered employee engagement platform with feedback
 
 - **Employee Dashboard**: Submit feedback, engage with AI chatbot, view chat sessions and feedback responses
 - **Admin Dashboard**: Manage feedback, oversee chat sessions, generate AI responses, approve replies, and monitor engagement metrics
-- **AI Integration**: OpenAI-powered chatbot for employee queries and professional response generation for feedback
+- **AI Integration**: OpenAI- or Gemini-powered chatbot for employee queries and professional response generation for feedback
 - **Scenario Knowledge Base**: MongoDB-backed scenario matching with local cosine-similarity fallback and an admin review queue
 - **Chat System**: Real-time AI chatbot interactions with session management and escalation to HR
 - **Feedback Management**: AI-enhanced feedback forms with question generation and refinement
@@ -19,7 +19,7 @@ A comprehensive full-stack AI-powered employee engagement platform with feedback
 - **Frontend**: React.js + Vite, Tailwind CSS, Redux Toolkit
 - **Backend**: Node.js + Express.js, MongoDB + Mongoose
 - **Authentication**: JWT with bcrypt
-- **AI**: OpenAI API
+- **AI**: OpenAI API or Google Gemini API
 - **Security**: Helmet, CORS, Rate Limiting, Input Validation
 
 ## Setup Instructions
@@ -28,7 +28,7 @@ A comprehensive full-stack AI-powered employee engagement platform with feedback
 
 - Node.js (v16 or higher)
 - MongoDB (local or cloud instance)
-- OpenAI API key
+- An OpenAI or Google Gemini API key (Gemini can be used instead of a billed OpenAI project)
 
 ### Backend Setup
 
@@ -48,9 +48,14 @@ A comprehensive full-stack AI-powered employee engagement platform with feedback
    JWT_SECRET=your-super-secret-jwt-key-here
    JWT_EXPIRE=7d
    FRONTEND_URL=http://localhost:5173
-   OPENAI_API_KEY=your-openai-api-key-here
+   # Choose one provider. Gemini avoids OpenAI 402 quota/billing errors.
+   AI_PROVIDER=gemini
+   GEMINI_API_KEY=your-google-gemini-api-key-here
+   GEMINI_MODEL=gemini-2.0-flash
    PORT=5002
    ```
+
+   To use OpenAI instead, set `AI_PROVIDER=openai` and `OPENAI_API_KEY` to a key from an OpenAI project with available billing quota. A 402 response means that project has no available quota; it cannot be repaired by changing the request payload.
 
 4. Start MongoDB locally (if not already running)
 
