@@ -17,7 +17,7 @@ A comprehensive full-stack AI-powered employee engagement platform with advanced
 - **Real-time Analytics**: Dashboard with feedback statistics, chat session metrics, engagement insights, and trend analysis
 - **Professional UI**: Enterprise-grade design with Tailwind CSS and fully responsive components
 
-### Advanced Features (Added Jul 17 - Aug 30)
+### Advanced Features (Jul 17 - Aug 30)
 - **Batch Operations**: Bulk feedback approval, status updates, and reply management from admin dashboard
 - **Advanced Filtering & Search**: Multi-field filtering, date range queries, sentiment analysis, and department-based segmentation
 - **Export Functionality**: Export feedback reports as CSV/PDF with customizable date ranges and filters
@@ -206,7 +206,7 @@ Users can self-register through the frontend signup page. New users are assigned
 - ✅ Test coverage reporting (87% backend, 82% frontend)
 - ✅ Documentation and README updates
 - ✅ Error handling improvements
-- ✅ Data export functionality (CSV/PDF)
+-  Data export functionality (CSV/PDF) [WIP]
 
 ## API Endpoints
 
@@ -385,7 +385,7 @@ npm run lint:fix      # Auto-fix style issues
 1. **Build Frontend**:
    ```bash
    cd frontend
-   npm run build
+   npm run dev
    # Output in frontend/dist/
    ```
 
