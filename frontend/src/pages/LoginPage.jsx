@@ -1,107 +1,94 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, Link } from 'react-router-dom';
-import { login, clearError } from '../store/slices/authSlice';
+import { Link, useNavigate } from 'react-router-dom';
+import { FiArrowRight, FiEye, FiEyeOff, FiLock } from 'react-icons/fi';
+import AuthLayout from '../components/AuthLayout';
+import { clearError, login } from '../store/slices/authSlice';
 
 const LoginPage = () => {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
-
+  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [showPassword, setShowPassword] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { loading, error, user } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    if (user) {
-      const redirectPath = user.role === 'admin' ? '/admin' : '/employee';
-      navigate(redirectPath);
-    }
+    if (user) navigate(user.role === 'admin' ? '/admin' : '/employee');
   }, [user, navigate]);
 
   useEffect(() => {
     dispatch(clearError());
   }, [dispatch]);
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+  const handleChange = (event) => {
+    setFormData((previous) => ({ ...previous, [event.target.name]: event.target.value }));
+    if (error) dispatch(clearError());
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = (event) => {
+    event.preventDefault();
     dispatch(login(formData));
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-secondary-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-secondary-900">
-            Sign in to your account
-          </h2>
-          <p className="mt-2 text-center text-sm text-secondary-600">
-            Don't have an account?{' '}
-            <Link to="/signup" className="font-medium text-primary-600 hover:text-primary-500">
-              Sign up here
-            </Link>
-          </p>
+    <AuthLayout mode="login">
+      <header className="auth-form-heading">
+        <span className="auth-form-kicker">WELCOME BACK</span>
+        <h2>Sign in to your space</h2>
+        <p>Pick up where you left off. Your workplace resources are right here.</p>
+      </header>
+
+      <form className="auth-form" onSubmit={handleSubmit}>
+        {error && <div className="auth-error" role="alert">{error}</div>}
+
+        <div className="auth-field">
+          <label htmlFor="email">Work email</label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            inputMode="email"
+            placeholder="you@company.com"
+            value={formData.email}
+            onChange={handleChange}
+            required
+          />
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                className="input-field rounded-t-lg"
-                placeholder="Email address"
-                value={formData.email}
-                onChange={handleChange}
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                className="input-field rounded-b-lg"
-                placeholder="Password"
-                value={formData.password}
-                onChange={handleChange}
-              />
-            </div>
+
+        <div className="auth-field">
+          <div className="auth-field-label-row">
+            <label htmlFor="password">Password</label>
+            <span className="auth-field-hint"><FiLock aria-hidden="true" /> Your account password</span>
           </div>
-
-          {error && (
-            <div className="rounded-md bg-error/10 p-4">
-              <div className="text-sm text-error">{error}</div>
-            </div>
-          )}
-
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Signing in...' : 'Sign in'}
+          <div className="auth-password-wrap">
+            <input
+              id="password"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              placeholder="Enter your password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+            />
+            <button type="button" className="auth-password-toggle" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+              {showPassword ? <FiEyeOff aria-hidden="true" /> : <FiEye aria-hidden="true" />}
             </button>
           </div>
-        </form>
+        </div>
+
+        <button type="submit" className="auth-submit" disabled={loading}>
+          <span>{loading ? 'Signing you in…' : 'Sign in'}</span>
+          {!loading && <FiArrowRight aria-hidden="true" />}
+        </button>
+      </form>
+
+      <div className="auth-switch">
+        <span>New to the portal?</span>
+        <Link to="/signup">Create an account <FiArrowRight aria-hidden="true" /></Link>
       </div>
-    </div>
+    </AuthLayout>
   );
 };
 

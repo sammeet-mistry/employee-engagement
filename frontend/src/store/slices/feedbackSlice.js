@@ -23,7 +23,7 @@ export const fetchMyFeedback = createAsyncThunk(
       const response = await axios.get(`${API_URL}/my`);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response.data.message);
+      return rejectWithValue(error.response?.data?.message || error.message || 'Unable to load your feedback.');
     }
   }
 );
@@ -35,7 +35,7 @@ export const fetchMyFeedbackWithReplies = createAsyncThunk(
       const response = await axios.get(`${API_URL}/my-with-replies`);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response.data.message);
+      return rejectWithValue(error.response?.data?.message || error.message || 'Unable to load your feedback.');
     }
   }
 );
@@ -121,6 +121,7 @@ const feedbackSlice = createSlice({
     stats: {},
     loading: false,
     error: null,
+    fetchError: null,
   },
   reducers: {
     clearError: (state) => {
@@ -143,25 +144,35 @@ const feedbackSlice = createSlice({
       })
       .addCase(fetchMyFeedback.pending, (state) => {
         state.loading = true;
+        state.error = null;
+        state.fetchError = null;
       })
       .addCase(fetchMyFeedback.fulfilled, (state, action) => {
         state.loading = false;
+        state.error = null;
+        state.fetchError = null;
         state.myFeedback = action.payload;
       })
       .addCase(fetchMyFeedback.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+        state.fetchError = action.payload;
       })
       .addCase(fetchMyFeedbackWithReplies.pending, (state) => {
         state.loading = true;
+        state.error = null;
+        state.fetchError = null;
       })
       .addCase(fetchMyFeedbackWithReplies.fulfilled, (state, action) => {
         state.loading = false;
+        state.error = null;
+        state.fetchError = null;
         state.myFeedback = action.payload;
       })
       .addCase(fetchMyFeedbackWithReplies.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+        state.fetchError = action.payload;
       })
       .addCase(fetchAllFeedback.pending, (state) => {
         state.loading = true;

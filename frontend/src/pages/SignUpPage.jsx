@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, Link } from 'react-router-dom';
-import { register, clearError } from '../store/slices/authSlice';
+import { Link, useNavigate } from 'react-router-dom';
+import { FiArrowRight, FiEye, FiEyeOff } from 'react-icons/fi';
+import AuthLayout from '../components/AuthLayout';
+import { clearError, register } from '../store/slices/authSlice';
 
 const SignUpPage = () => {
   const [formData, setFormData] = useState({
@@ -9,174 +11,146 @@ const SignUpPage = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    department: '',
+    department: ''
   });
   const [passwordError, setPasswordError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { loading, error, user } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    if (user) {
-      navigate(user.role === 'admin' ? '/admin' : '/employee');
-    }
+    if (user) navigate(user.role === 'admin' ? '/admin' : '/employee');
   }, [user, navigate]);
 
   useEffect(() => {
     dispatch(clearError());
   }, [dispatch]);
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-    
+  const handleChange = (event) => {
+    setFormData((previous) => ({ ...previous, [event.target.name]: event.target.value }));
+    if (error) dispatch(clearError());
+    if (passwordError) setPasswordError('');
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setPasswordError('');
-
+  const handleSubmit = (event) => {
+    event.preventDefault();
     if (formData.password !== formData.confirmPassword) {
-      setPasswordError('Passwords do not match');
+      setPasswordError('Your passwords don’t match yet. Check them and try again.');
       return;
     }
 
     const { confirmPassword, ...registerData } = formData;
-    registerData.role = 'employee'; // Default role for self-registration
-
+    registerData.role = 'employee';
     dispatch(register(registerData));
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-secondary-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-secondary-900">
-            Create your account
-          </h2>
-          <p className="mt-2 text-center text-sm text-secondary-600">
-            Already have an account?{' '}
-            <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500">
-              Sign in here
-            </Link>
-          </p>
+    <AuthLayout mode="signup">
+      <header className="auth-form-heading">
+        <span className="auth-form-kicker">GET STARTED</span>
+        <h2>Create your account</h2>
+        <p>Join your employee portal to share feedback and explore workplace resources.</p>
+      </header>
+
+      <form className="auth-form auth-form-signup" onSubmit={handleSubmit}>
+        {error && <div className="auth-error" role="alert">{error}</div>}
+
+        <div className="auth-field">
+          <label htmlFor="name">Full name</label>
+          <input
+            id="name"
+            name="name"
+            type="text"
+            autoComplete="name"
+            placeholder="Your name"
+            value={formData.name}
+            onChange={handleChange}
+            minLength={2}
+            maxLength={50}
+            required
+          />
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="name" className="sr-only">
-                Full Name
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-secondary-300 placeholder-secondary-500 text-secondary-900 rounded-t-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
-                placeholder="Full Name"
-                value={formData.name}
-                onChange={handleChange}
-              />
-            </div>
-            <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-secondary-300 placeholder-secondary-500 text-secondary-900 focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
-                value={formData.email}
-                onChange={handleChange}
-              />
-            </div>
-            <div>
-              <label htmlFor="department" className="sr-only">
-                Department
-              </label>
-              <input
-                id="department"
-                name="department"
-                type="text"
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-secondary-300 placeholder-secondary-500 text-secondary-900 focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
-                placeholder="Department (optional)"
-                value={formData.department}
-                onChange={handleChange}
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  required
-                  className="appearance-none rounded-none relative block w-full px-3 py-2 pr-16 border border-secondary-300 placeholder-secondary-500 text-secondary-900 focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
-                  placeholder="Password (min 6 characters)"
-                  value={formData.password}
-                  onChange={handleChange}
-                />
-                <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="absolute inset-y-0 right-0 px-3 text-xs font-medium text-primary-600 hover:text-primary-800" aria-label={showPassword ? 'Hide password' : 'Show password'}>
-                  {showPassword ? 'Hide' : 'Show'}
-                </button>
-              </div>
-            </div>
-            <div>
-              <label htmlFor="confirmPassword" className="sr-only">
-                Confirm Password
-              </label>
-              <div className="relative">
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  required
-                  className="appearance-none rounded-none relative block w-full px-3 py-2 pr-16 border border-secondary-300 placeholder-secondary-500 text-secondary-900 rounded-b-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
-                  placeholder="Confirm Password"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                />
-              </div>
-            </div>
-          </div>
 
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-700">{error}</div>
-            </div>
-          )}
+        <div className="auth-field">
+          <label htmlFor="email">Work email</label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            inputMode="email"
+            placeholder="you@company.com"
+            value={formData.email}
+            onChange={handleChange}
+            required
+          />
+        </div>
 
-          {passwordError && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-700">{passwordError}</div>
-            </div>
-          )}
+        <div className="auth-field">
+          <label htmlFor="department">Department <span className="auth-optional">(optional)</span></label>
+          <input
+            id="department"
+            name="department"
+            type="text"
+            autoComplete="organization-title"
+            placeholder="e.g. People & Culture"
+            value={formData.department}
+            onChange={handleChange}
+            maxLength={50}
+          />
+        </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading || formData.password !== formData.confirmPassword}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Creating account...' : 'Sign up'}
+        <div className="auth-field">
+          <label htmlFor="password">Create a password</label>
+          <div className="auth-password-wrap">
+            <input
+              id="password"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              placeholder="At least 6 characters"
+              value={formData.password}
+              onChange={handleChange}
+              minLength={6}
+              required
+            />
+            <button type="button" className="auth-password-toggle" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+              {showPassword ? <FiEyeOff aria-hidden="true" /> : <FiEye aria-hidden="true" />}
             </button>
           </div>
-        </form>
+          <span className="auth-field-footnote">Use at least 6 characters.</span>
+        </div>
+
+        <div className="auth-field">
+          <label htmlFor="confirmPassword">Confirm password</label>
+          <input
+            id="confirmPassword"
+            name="confirmPassword"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="new-password"
+            placeholder="Enter your password again"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            minLength={6}
+            required
+            aria-invalid={Boolean(passwordError)}
+            aria-describedby={passwordError ? 'confirm-password-error' : undefined}
+          />
+          {passwordError && <span id="confirm-password-error" className="auth-inline-error" role="alert">{passwordError}</span>}
+        </div>
+
+        <button type="submit" className="auth-submit" disabled={loading}>
+          <span>{loading ? 'Creating your account…' : 'Create account'}</span>
+          {!loading && <FiArrowRight aria-hidden="true" />}
+        </button>
+      </form>
+
+      <div className="auth-switch">
+        <span>Already have an account?</span>
+        <Link to="/login">Sign in <FiArrowRight aria-hidden="true" /></Link>
       </div>
-    </div>
+    </AuthLayout>
   );
 };
 

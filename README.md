@@ -1,20 +1,20 @@
 # Employee Engagement Platform
 
-A comprehensive full-stack AI-powered employee engagement platform with advanced feedback management, real-time AI chatbot interactions, intelligent scenario matching, and comprehensive admin oversight for fostering workplace communication and satisfaction.
+A full-stack employee engagement platform for feedback submissions, HR follow-up, and role-based administration. Employee chat uses a server-side adapter for the organization's existing retrieval-augmented HR knowledge agent; the agent itself is maintained separately and must be running and securely configured for chat to answer questions.
 
 **Last Updated**: August 30, 2026 | **Version**: 1.2.0
 
 ## Features
 
 ### Core Features
-- **Employee Dashboard**: Submit feedback, engage with AI chatbot, view chat sessions and feedback responses, track engagement history
-- **Admin Dashboard**: Comprehensive feedback management, chat session oversight, AI-powered response generation, reply approval workflow, and real-time engagement metrics
-- **AI Integration**: OpenAI- or Gemini-powered intelligent chatbot for employee queries and professional response generation with context awareness
-- **Scenario Knowledge Base**: MongoDB-backed scenario matching with local cosine-similarity fallback and admin review queue for continuous learning
-- **Chat System**: Real-time AI chatbot interactions with session management, escalation to HR, and conversation history
-- **Feedback Management**: AI-enhanced feedback forms with intelligent question generation, refinement suggestions, and categorization
+- **Employee Dashboard**: Responsive workspace for employee profile context, feedback history, filtering, guided submissions, and HR resource conversations
+- **Admin Dashboard**: Feedback management, conversation oversight, response approval, scenario management, and review queue
+- **Feedback AI**: Existing OpenAI/Gemini services support feedback questionnaires, feedback processing, and admin reply drafting; they do not power employee chat
+- **Scenario Matching**: MongoDB-backed scenario matching and admin review queue remain separate from document retrieval
+- **HR Knowledge Assistant**: Chat contract boundary for the approved RAG agent, with source references, no-source handling, and HR escalation support
+- **Feedback Management**: AI-enhanced feedback forms, employee and HR message threads, question generation, refinement suggestions, and categorization
 - **Role-based Access**: Secure authentication with JWT for employees and admins with granular permission control
-- **Real-time Analytics**: Dashboard with feedback statistics, chat session metrics, engagement insights, and trend analysis
+- **Employee Activity Summary**: Counts are derived from the signed-in employee's stored feedback; no unsupported analytics are displayed
 - **Professional UI**: Enterprise-grade design with Tailwind CSS and fully responsive components
 
 ### Advanced Features (Jul 17 - Aug 30)
@@ -34,7 +34,7 @@ A comprehensive full-stack AI-powered employee engagement platform with advanced
 - **Frontend**: React.js + Vite, Tailwind CSS, Redux Toolkit, Axios for HTTP client
 - **Backend**: Node.js + Express.js, MongoDB + Mongoose, Socket.IO for real-time communication
 - **Authentication**: JWT with bcrypt for secure password hashing
-- **AI Services**: OpenAI API or Google Gemini API with fallback mechanisms
+- **Feedback AI Services**: OpenAI API or Google Gemini API for the existing feedback/questionnaire and admin workflows
 - **Caching & Jobs**: Redis for caching and Bull for job queue management (added Aug 15)
 - **Testing**: Jest for unit testing, Supertest for API testing, React Testing Library for components (added Aug 5)
 - **Security**: Helmet, CORS, Rate Limiting, Input Validation, SQL injection prevention
@@ -46,7 +46,7 @@ A comprehensive full-stack AI-powered employee engagement platform with advanced
 
 - Node.js (v16 or higher)
 - MongoDB (local or cloud instance)
-- An OpenAI or Google Gemini API key (Gemini can be used instead of a billed OpenAI project)
+- An OpenAI or Google Gemini API key for existing feedback/questionnaire and admin AI workflows (optional for the separately configured HR knowledge assistant)
 
 ### Backend Setup
 
@@ -66,7 +66,8 @@ A comprehensive full-stack AI-powered employee engagement platform with advanced
    JWT_SECRET=your-super-secret-jwt-key-here
    JWT_EXPIRE=7d
    FRONTEND_URL=http://localhost:5173
-   # Choose one provider. Gemini avoids OpenAI 402 quota/billing errors.
+   # These provider settings are for feedback/questionnaire and admin AI only.
+   # Employee chat does not call either provider.
    AI_PROVIDER=gemini
    GEMINI_API_KEY=your-google-gemini-api-key-here
    GEMINI_MODEL=gemini-2.0-flash
@@ -81,7 +82,7 @@ A comprehensive full-stack AI-powered employee engagement platform with advanced
    EMAIL_PASSWORD=your-app-password
    ```
 
-   To use OpenAI instead, set `AI_PROVIDER=openai` and `OPENAI_API_KEY` to a key from an OpenAI project with available billing quota. A 402 response means that project has no available quota; it cannot be repaired by changing the request payload.
+   To use OpenAI for the existing feedback-related AI workflows instead, set `AI_PROVIDER=openai` and `OPENAI_API_KEY`. These settings do not connect the RAG agent.
 
 4. Start MongoDB locally (if not already running):
    ```bash
@@ -97,7 +98,7 @@ A comprehensive full-stack AI-powered employee engagement platform with advanced
    ```bash
    npm run seed
    ```
-   This creates an admin user with email `admin@company.com` and password `Admin@123`.
+   Set `ADMIN_NAME`, `ADMIN_EMAIL`, and a unique `ADMIN_PASSWORD` of at least 12 characters in the backend environment first. The seed command creates a new administrator only; it will not delete or overwrite an existing account.
 
 7. Start the backend server:
    ```bash
@@ -142,16 +143,16 @@ A comprehensive full-stack AI-powered employee engagement platform with advanced
 
 The frontend expects the backend at `http://localhost:5002`.
 
-### Admin Access
+### Sign-in examples
 
-The seed command creates the initial administrator:
+Open the frontend at `http://localhost:5173/login`:
 
-- **Email**: `admin@company.com`
-- **Password**: `Admin@123`
-- **Role**: `admin`
-- **Department**: `IT Management`
+| Account | Email | Password | How it is created |
+|---|---|---|---|
+| HR / Administration | The `ADMIN_EMAIL` value you configured | The `ADMIN_PASSWORD` value you configured | Set the administrator environment values, then run `cd backend` and `npm run seed` |
+| Employee | `employee.demo@company.com` | The password you chose during registration | Open `http://localhost:5173/signup` and create an account; self-registration assigns the `employee` role |
 
-**Important**: Change the seeded password before using in a shared or production environment.
+The employee row above is an example, not a pre-seeded account. No employee demo account is currently created by `seed.js`. Do not reuse local demonstration account credentials in production.
 
 #### Password Reset
 
@@ -163,26 +164,65 @@ Follow the prompts to select a user and set a new password.
 
 ### User Registration
 
-Users can self-register through the frontend signup page. New users are assigned the `employee` role by default. Admins can be created:
-1. Via database directly (not recommended for production)
-2. By using an admin panel feature (future enhancement)
-3. By modifying existing user roles directly in MongoDB
+Employees can self-register through the frontend signup page. New users are assigned the `employee` role by default. Create an administrator using the backend seed command and its `ADMIN_NAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` settings. Public self-registration always creates employee accounts.
+
+## Deploying with Render and Vercel
+
+The recommended arrangement is the Express API on Render and the Vite single-page application on Vercel. MongoDB must be reachable from Render. The repository includes a Render Blueprint in `render.yaml` and SPA route rewrites in `frontend/vercel.json`.
+
+### 1. Prepare MongoDB Atlas
+
+1. Create a MongoDB Atlas database and a dedicated database user with a strong unique password.
+2. Add the network access rule required for your Render service. Render outbound IP ranges vary by service and plan; use Atlas's documented Render connectivity options if available. Only use `0.0.0.0/0` if necessary, with database authentication and least-privilege access enabled.
+3. Copy the application connection string. Keep it private.
+
+### 2. Deploy the API to Render
+
+1. Push the repository to GitHub. Do not commit `.env` files.
+2. In Render, choose **New +**, then **Blueprint**, and connect this repository. Render reads `render.yaml`. The service root is `backend`, the build command is `npm ci`, the start command is `npm start`, and its health check is `/api/health`.
+3. Supply the `MONGODB_URI` connection string and `FRONTEND_URL`. You can initially use the Vercel production origin after creating the frontend deployment. Origins are exact and can be comma-separated, for example `https://your-project.vercel.app,https://www.your-domain.example`.
+4. Render generates `JWT_SECRET`. Keep it private and do not rotate it casually, since rotation signs out existing sessions.
+5. Wait for the Render service to report healthy, then verify `https://YOUR-RENDER-SERVICE.onrender.com/api/health` returns JSON with `"status":"OK"`.
+6. Create the first administrator only after deployment, using a unique password of at least 12 characters. In Render's service Shell, from the backend service root, run `ADMIN_NAME='XYZ HR Administrator' ADMIN_EMAIL='hr-admin@your-domain.example' ADMIN_PASSWORD='<your-unique-secret>' npm run seed`, replacing the example name, email, and password with your own values. Do not use the literal example values. The command does not print the password and refuses to overwrite an existing account. Avoid saving the temporary password as a permanent service environment variable. Do not use any old local demo admin credentials.
+
+### 3. Deploy the frontend to Vercel
+
+1. In Vercel, import the same GitHub repository as a separate project.
+2. Set **Root Directory** to `frontend`.
+3. Use the Vite defaults, or set build command to `npm run build` and output directory to `dist`.
+4. Add `VITE_API_URL=https://YOUR-RENDER-SERVICE.onrender.com` for Production and any Preview environments that should call the API. Do not add a trailing slash. This value is public configuration, not a secret.
+5. Deploy. The `frontend/vercel.json` rewrite supports direct navigation and refresh on routes such as `/login`, `/signup`, `/employee`, and `/admin`.
+6. Copy the exact Vercel production origin into Render's `FRONTEND_URL` setting, then redeploy the API. If Vercel preview deployments should also call the API, add their exact origins to the comma-separated allowlist. Redeploy after changing environment variables.
+
+### 4. Production setup and smoke test
+
+- Employee accounts can register at `/signup`. Administrator accounts must be provisioned separately as described above.
+- Check the Render health endpoint, sign in as the provisioned administrator, register an employee, submit feedback, reply as HR, and confirm the employee can see the conversation.
+- Render free services may sleep when idle, which can make the first request slow. Socket.IO and the API are served by the same Render service.
+- Existing feedback/questionnaire AI also needs the appropriate server-side provider configuration if those features are required. Never put provider credentials in `VITE_*` variables.
+
+### Important RAG deployment limitation
+
+The current RAG Agent is a separate Python application that depends on a local Ollama model and Chroma handbook index. `127.0.0.1` in the Render API environment refers to the Render API container, not your computer. The local demo agent is not publicly reachable from Render. The production backend intentionally refuses employee RAG questions unless a verified upstream authentication header is configured.
+
+Before enabling employee RAG in production, deploy the existing RAG service and its model/index to an appropriately persistent host, require HTTPS and agent-side authentication, and remove sensitive question/output logging. Then configure `RAG_AGENT_URL`, `RAG_AGENT_AUTH_HEADER`, and `RAG_AGENT_AUTH_VALUE` on Render, verify the upstream actually enforces that header, and only then set `RAG_AGENT_AUTH_VERIFIED=true`. Do not expose the unauthenticated local Flask development server to the public internet. If these steps are not complete, the web app can still be hosted, but RAG chat will remain unavailable by design.
 
 ## Usage
 
 1. Visit `http://localhost:5173` for the landing page
-2. Click "Login as Employee" or "Login as Admin"
-3. Register or login with existing credentials
+2. Choose **Login** or **Sign Up**
+3. Use the administrator account you provisioned or register an employee account
 4. Employees can submit feedback and view responses
 5. Admins can manage feedback, generate AI replies, and approve responses
-6. Chat with the AI assistant for real-time employee support
+6. Ask workplace questions in the HR knowledge assistant (requires the organization's RAG agent integration; see the status section above)
 
 ## Project Timeline & Implementation (Jul 17 - Aug 30, 2026)
 
 ### Phase 1: Core System (Jul 17 - Jul 31)
 - ✅ User authentication system with JWT and role-based access
 - ✅ Feedback submission and management system
-- ✅ AI chatbot integration with OpenAI/Gemini
+- ✅ Feedback questionnaire and admin AI workflows
+- ⏳ Employee RAG assistant adapter (waiting for the existing agent contract)
 - ✅ Admin dashboard for feedback oversight
 - ✅ Chat session management
 - ✅ Real-time notifications via Socket.IO
@@ -215,17 +255,56 @@ Users can self-register through the frontend signup page. New users are assigned
 - `POST /api/auth/login` - Login and receive JWT token
 - `GET /api/auth/profile` - Get authenticated user profile (Protected)
 
-### Chat Management
-- `POST /api/chat/session` - Create new chat session
-- `GET /api/chat/sessions` - Retrieve user's chat sessions
-- `POST /api/chat/message` - Send message in chat (Real-time via Socket.IO)
-- `GET /api/chat/session/:id/history` - Get chat conversation history
-- `POST /api/chat/escalate/:sessionId` - Escalate chat to HR
+### Employee HR Knowledge Assistant
+All chat routes require a valid JWT. Employee session queries and mutations are scoped to the authenticated employee; only admin routes can list all sessions or add an HR/admin message.
+
+- `POST /api/chat/session` - Create an empty HR knowledge assistant conversation
+- `GET /api/chat/sessions/my` - Retrieve the authenticated employee's sessions
+- `GET /api/chat/sessions/all` - List sessions for the admin review surface (admin only)
+- `GET /api/chat/session/:sessionId` - Read a session (owner or admin)
+- `POST /api/chat/session/:sessionId/message` - Send a question through the RAG adapter
+- `POST /api/chat/session/:sessionId/send-to-hr` - Add the employee/assistant transcript to the employee's feedback history for HR follow-up
+- `POST /api/chat/session/:sessionId/escalate` - Mark a conversation for the existing HR conversation review queue
+- `POST /api/chat/session/:sessionId/admin-message` - Add an admin message (admin only)
+
+**RAG integration:** the adapter calls the existing [RAG-Agent Flask API](https://github.com/sammeet-mistry/RAG-Agent), `POST /ask` with `{"question":"..."}`. Its current response is `{"answer":"...","sources":["handbook.pdf - Page 12"]}`. The checked-in Flask API does not accept conversation history, does not return the `confidence` or structured source objects from the supplied example, and has no authentication. The adapter sends only the current question, maps actual source strings into title/page references, and treats responses without a real source as unreliable. It recognizes the agent's “couldn't find that information” response and “No sufficiently relevant source found” marker as no-answer results.
+
+The current RAG source code starts its subprocess with an empty in-memory conversation history for each request; conversation history is retained in this application's session but is not sent to the agent because its API has no history field. The checked-in ingestion script reads `data/handbook.pdf` into Chroma's `employee_handbook` collection under `vector_db`; confirm that PDF and indexed content are the currently approved HR sources before relying on answers. Scenario matching remains a separate safety/routing feature and is not document retrieval.
+
+For local development, set backend-only `RAG_AGENT_URL=http://127.0.0.1:5000/ask` and start the Flask service with `python app.py` from the RAG-Agent repository. Set `RAG_AGENT_TIMEOUT_MS` if the default 185-second client timeout needs to match agent deployment latency. No provider keys or RAG credentials belong in Vite variables. In production the adapter refuses requests unless `RAG_AGENT_AUTH_HEADER`, `RAG_AGENT_AUTH_VALUE`, and `RAG_AGENT_AUTH_VERIFIED=true` are configured. The current Flask route does not validate an auth header, so these variables alone do not secure it: implement and verify matching authentication in the agent before setting the verification flag or deploying it.
+
+#### Local Windows demo setup
+
+The employee-engagement repository does not include the separate RAG-Agent checkout. If both repositories are sibling folders, start the demo like this:
+
+1. Start from the employee-engagement repository root. Make sure MongoDB is running and Ollama has the `llama3.2` model available.
+2. In a terminal, switch to the sibling RAG-Agent folder, create its local Python environment, and install its runtime dependencies if needed:
+   ```powershell
+   cd ..\RAG-Agent
+   python -m venv .venv
+   .\.venv\Scripts\python.exe -m pip install flask chromadb ollama sentence-transformers
+   .\.venv\Scripts\python.exe app.py
+   ```
+   The existing checkout should contain `data\handbook.pdf` and the populated `vector_db` index. Keep this Flask development service bound to `127.0.0.1`; it has no authentication.
+3. In a second terminal opened at the employee-engagement repository root, start the backend. Its local `.env` must point to `RAG_AGENT_URL=http://127.0.0.1:5000/ask`:
+   ```powershell
+   cd backend
+   npm run dev
+   ```
+4. In a third terminal opened at the employee-engagement repository root, start the frontend:
+   ```powershell
+   cd frontend
+   npm run dev
+   ```
+5. Open `http://127.0.0.1:5173/login` and sign in with an employee account. A useful smoke-test question for the checked-in handbook is: “How many paid time off days do employees receive per year?”
+
+**Production blockers in the upstream RAG-Agent source:** its `app.py` enables Flask debug mode and logs questions and captured subprocess output. The local demo checkout has debug disabled and those content logs removed, but those local-only changes are not part of this repository. Before deploying the upstream service, disable debug mode and redact/remove sensitive logs. The agent must also enforce service authentication, validate the question, and return structured source/relevance metadata if richer citations or confidence handling are required. No credentials were added to this repository.
 
 ### Feedback (Employee)
 - `POST /api/feedback` - Submit new feedback with AI processing
 - `GET /api/feedback/my` - Get user's submitted feedback
-- `GET /api/feedback/my-with-replies` - Get feedback with admin replies
+- `GET /api/feedback/my-with-replies` - Get feedback with HR replies and conversation messages
+- `POST /api/feedback/:id/messages` - Add a message to the feedback conversation; employees can access only their own feedback and HR administrators can respond to any feedback
 - `PUT /api/feedback/:id/read` - Mark feedback reply as read
 
 ### Feedback (Admin)
@@ -261,8 +340,8 @@ Users can self-register through the frontend signup page. New users are assigned
 - `GET /api/admin/export/feedback?format=csv&dateRange=` - Export feedback data
 
 ### Real-time Events (Socket.IO)
-- `message` - New chat message received
-- `response` - AI response generated
+- `chat:session-updated` - Chat session changed
+- `scenario:unmatched` - Scenario matching needs review
 - `notification` - Admin/employee notifications
 - `status-update` - Feedback status changed
 - `session-joined` - User joined session
@@ -491,7 +570,7 @@ Comprehensive testing has been implemented across all layers of the application 
 - **Component Testing** (React Testing Library):
   - LoginPage: Form validation, error messaging, navigation
   - SignUpPage: Registration flow, password requirements
-  - AIChatbot: Message sending, response display, session handling
+  - HRKnowledgeAssistant: Conversation history, source references, and HR handoff
   - FeedbackForm: Form submission, field validation, file uploads
   - AdminDashboard: Data filtering, pagination, bulk operations
   - StatsCards: Data rendering, metric calculations

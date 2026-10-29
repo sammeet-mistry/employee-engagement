@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSelector } from 'react-redux';
 import axios from '../utils/axios';
 
 const categoryOptions = [
@@ -20,6 +21,7 @@ const defaultQuestions = [
 ];
 
 const AIQuestionnaire = ({ onSubmitSuggestion }) => {
+  const { loading: submitting, error: submissionError } = useSelector((state) => state.feedback);
   const [formData, setFormData] = useState({
     title: '',
     category: 'General',
@@ -34,6 +36,7 @@ const AIQuestionnaire = ({ onSubmitSuggestion }) => {
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [loadingSuggestion, setLoadingSuggestion] = useState(false);
   const [error, setError] = useState(null);
+  const [submitted, setSubmitted] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -93,13 +96,13 @@ const AIQuestionnaire = ({ onSubmitSuggestion }) => {
     }
   };
 
-  const handleSubmitSuggested = () => {
+  const handleSubmitSuggested = async () => {
     if (!aiSuggestion) return;
     const safeCategory = categoryOptions.includes(aiSuggestion.improvedCategory)
       ? aiSuggestion.improvedCategory
       : formData.category;
 
-    onSubmitSuggestion({
+    const success = await onSubmitSuggestion({
       title: aiSuggestion.improvedTitle,
       category: safeCategory,
       description: aiSuggestion.improvedDescription,
@@ -108,20 +111,22 @@ const AIQuestionnaire = ({ onSubmitSuggestion }) => {
       anonymous: false,
       questionAnswers: answers
     });
+    setSubmitted(Boolean(success));
   };
 
   return (
     <div className="card space-y-6">
       <div className="space-y-2">
-        <h2 className="text-xl font-semibold text-secondary-900">AI Questionnaire Assistant</h2>
-        <p className="text-secondary-600">Create polished feedback through guided AI questions. This workflow is optimized for large teams so your input is structured, professional, and instantly acknowledged.</p>
+        <h2 className="text-xl font-semibold text-secondary-900">Guided feedback questionnaire</h2>
+        <p className="text-secondary-600">Use optional prompts and an AI-drafted edit to organize your feedback. Review the draft before choosing to submit it.</p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-secondary-700 mb-1">Feedback category</label>
+            <label htmlFor="questionnaire-category" className="block text-sm font-medium text-secondary-700 mb-1">Feedback category</label>
             <select
+              id="questionnaire-category"
               name="category"
               className="input-field"
               value={formData.category}
@@ -134,8 +139,9 @@ const AIQuestionnaire = ({ onSubmitSuggestion }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-secondary-700 mb-1">Draft title (optional)</label>
+            <label htmlFor="questionnaire-title" className="block text-sm font-medium text-secondary-700 mb-1">Draft title (optional)</label>
             <input
+              id="questionnaire-title"
               type="text"
               name="title"
               className="input-field"
@@ -146,8 +152,9 @@ const AIQuestionnaire = ({ onSubmitSuggestion }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-secondary-700 mb-1">Draft description</label>
+            <label htmlFor="questionnaire-description" className="block text-sm font-medium text-secondary-700 mb-1">Draft description</label>
             <textarea
+              id="questionnaire-description"
               name="description"
               rows={4}
               className="input-field"
@@ -159,8 +166,9 @@ const AIQuestionnaire = ({ onSubmitSuggestion }) => {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-secondary-700 mb-1">Priority</label>
+              <label htmlFor="questionnaire-priority" className="block text-sm font-medium text-secondary-700 mb-1">Priority</label>
               <select
+                id="questionnaire-priority"
                 name="priority"
                 className="input-field"
                 value={formData.priority}
@@ -173,8 +181,9 @@ const AIQuestionnaire = ({ onSubmitSuggestion }) => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-secondary-700 mb-1">Department / Team</label>
+              <label htmlFor="questionnaire-department" className="block text-sm font-medium text-secondary-700 mb-1">Department / Team</label>
               <input
+                id="questionnaire-department"
                 type="text"
                 name="department"
                 className="input-field"
@@ -199,13 +208,13 @@ const AIQuestionnaire = ({ onSubmitSuggestion }) => {
           <div className="card">
             <h3 className="font-semibold text-secondary-900">What this does</h3>
             <p className="text-secondary-600 mt-2">Answer the guided questions below and the AI will turn your responses into a stronger, more actionable feedback message.</p>
-            <p className="text-secondary-600 mt-2">For enterprise users, every submission also receives an immediate AI acknowledgement so your feedback is tracked and recognized without delay.</p>
             <p className="text-secondary-700 mb-3">{intro}</p>
             <ul className="space-y-2">
               {questions.map((question, index) => (
                 <li key={index} className="space-y-2">
-                  <label className="block text-sm font-medium text-secondary-700">{question}</label>
+                  <label htmlFor={`questionnaire-answer-${index}`} className="block text-sm font-medium text-secondary-700">{question}</label>
                   <textarea
+                    id={`questionnaire-answer-${index}`}
                     rows={3}
                     className="input-field"
                     value={answers[question] || ''}
@@ -229,8 +238,19 @@ const AIQuestionnaire = ({ onSubmitSuggestion }) => {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-error-200 bg-error-50 p-4 text-sm text-error-700">
+        <div className="rounded-lg border border-error-200 bg-error-50 p-4 text-sm text-error-700" role="alert">
           {error}
+        </div>
+      )}
+      {submissionError && (
+        <div className="rounded-lg border border-error-200 bg-error-50 p-4 text-sm text-error-700" role="alert">
+          {submissionError}
+        </div>
+      )}
+
+      {submitted && (
+        <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800" role="status">
+          Your guided feedback was submitted.
         </div>
       )}
 
@@ -244,9 +264,10 @@ const AIQuestionnaire = ({ onSubmitSuggestion }) => {
             <button
               type="button"
               onClick={handleSubmitSuggested}
+              disabled={submitting}
               className="btn-primary"
             >
-              Submit AI Feedback
+              {submitting ? 'Submitting…' : 'Submit guided feedback'}
             </button>
           </div>
 

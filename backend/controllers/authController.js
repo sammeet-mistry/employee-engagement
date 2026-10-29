@@ -16,7 +16,7 @@ exports.register = async (req, res) => {
     return res.status(400).json({ message: errors.array()[0].msg, errors: errors.array() });
   }
 
-  const { name, email, password, role, department } = req.body;
+  const { name, email, password, department } = req.body;
 
   try {
     const existingUser = await User.findOne({ email });
@@ -28,7 +28,7 @@ exports.register = async (req, res) => {
       name,
       email,
       password,
-      role: role || "employee",
+      role: "employee",
       department
     });
     await user.save();

@@ -1,42 +1,44 @@
+require("dotenv").config();
 const mongoose = require("mongoose");
 const User = require("./models/User");
-require("dotenv").config();
 
 const seedAdmin = async () => {
+  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.ADMIN_PASSWORD;
+  const name = process.env.ADMIN_NAME?.trim();
+  const department = process.env.ADMIN_DEPARTMENT?.trim();
+
   try {
-    await mongoose.connect(process.env.MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    });
-    
-    // Delete existing admin user if it exists
-    const adminExists = await User.findOne({ email: "admin@company.com" });
-    if (adminExists) {
-      await User.deleteOne({ email: "admin@company.com" });
-      console.log("? Existing admin user deleted");
+    if (!email || !password || !name) {
+      throw new Error('Set ADMIN_EMAIL, ADMIN_PASSWORD, and ADMIN_NAME to create an administrator.');
+    }
+    if (password.length < 12) {
+      throw new Error('ADMIN_PASSWORD must be at least 12 characters long.');
+    }
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI is not configured.');
     }
 
-    // Create admin user
-    const admin = new User({
-      name: "Command Admin",
-      email: "admin@company.com",
-      password: "Admin@123", // Will be hashed by pre-save hook
+    await mongoose.connect(process.env.MONGODB_URI);
+    const adminExists = await User.findOne({ email });
+    if (adminExists) {
+      throw new Error(`An account already exists for ${email}. No account was changed.`);
+    }
+
+    await User.create({
+      name,
+      email,
+      password,
       role: "admin",
-      department: "IT Management"
+      department: department || "Administration"
     });
 
-    await admin.save();
-    console.log("? Admin user created successfully!");
-    console.log("Email: admin@company.com");
-    console.log("Password: Admin@123");
-    console.log("Role: admin");
-    console.log("Department: IT Management");
-    
-    mongoose.connection.close();
+    console.log(`Administrator created for ${email}.`);
   } catch (error) {
-    console.error("Error seeding admin:", error.message);
-    mongoose.connection.close();
-    process.exit(1);
+    console.error("Unable to create administrator:", error.message);
+    process.exitCode = 1;
+  } finally {
+    await mongoose.disconnect();
   }
 };
 

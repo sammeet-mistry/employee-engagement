@@ -115,12 +115,24 @@ const AdminChatSessions = () => {
 
                 <div className="space-y-3 max-h-[340px] overflow-y-auto rounded-2xl border border-secondary-200 bg-white p-4">
                   {activeSession.messages.map((messageItem, index) => (
-                    <div key={`${messageItem.sender}-${index}`} className={`rounded-2xl p-4 ${messageItem.sender === 'employee' ? 'bg-secondary-100' : messageItem.sender === 'ai' ? 'bg-indigo-50' : messageItem.sender === 'admin' ? 'bg-amber-50' : 'bg-slate-100'}`}>
+                    <div key={`${messageItem.sender}-${index}`} className={`rounded-2xl p-4 ${messageItem.sender === 'employee' ? 'bg-secondary-100' : ['ai', 'rag'].includes(messageItem.sender) ? 'bg-indigo-50' : messageItem.sender === 'admin' ? 'bg-amber-50' : 'bg-slate-100'}`}>
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-xs font-semibold text-secondary-700 capitalize">{messageItem.sender === 'employee' ? 'Employee' : messageItem.sender === 'ai' ? 'HR AI' : messageItem.sender === 'admin' ? 'Admin' : messageItem.sender}</span>
+                      <span className="text-xs font-semibold text-secondary-700 capitalize">{messageItem.sender === 'employee' ? 'Employee' : messageItem.sender === 'rag' ? 'HR Knowledge Assistant' : messageItem.sender === 'ai' ? 'Previous assistant' : messageItem.sender === 'admin' ? 'Admin' : messageItem.sender}</span>
                         <span className="text-xs text-secondary-400">{formatFullDateTime(messageItem.createdAt)}</span>
                       </div>
                       <p className="mt-2 text-sm text-secondary-700 whitespace-pre-wrap">{messageItem.text}</p>
+                    {messageItem.sender === 'rag' && messageItem.sources?.length > 0 && (
+                      <ul className="mt-3 space-y-1 text-xs text-secondary-600" aria-label="Assistant source references">
+                        {messageItem.sources.map((source, sourceIndex) => (
+                          <li key={`${source.title}-${sourceIndex}`}>
+                            <span className="font-medium">{source.title}</span>
+                            {source.section && <span> · {source.section}</span>}
+                            {source.page !== undefined && <span> · Page {source.page}</span>}
+                            {source.url && <a className="ml-2 underline" href={source.url} target="_blank" rel="noreferrer">Open source</a>}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                     </div>
                   ))}
                 </div>

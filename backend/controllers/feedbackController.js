@@ -1,5 +1,6 @@
 const Feedback = require("../models/Feedback");
 const Reply = require("../models/Reply");
+const mongoose = require('mongoose');
 const {
   analyzeSentiment,
   generateAIQuestions,
@@ -102,6 +103,40 @@ exports.getMyFeedback = async (req, res) => {
     res.json(feedback);
   } catch (err) {
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.addFeedbackMessage = async (req, res) => {
+  const text = typeof req.body.message === 'string' ? req.body.message.trim() : '';
+  if (!text) return res.status(400).json({ message: 'Write a message before sending.' });
+  if (text.length > 4000) return res.status(400).json({ message: 'Messages must be 4000 characters or fewer.' });
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(404).json({ message: 'Feedback not found.' });
+
+  try {
+    const query = { _id: req.params.id };
+    if (req.user.role !== 'admin') query.submittedBy = req.user.id;
+
+    const feedback = await Feedback.findOne(query);
+    if (!feedback) return res.status(404).json({ message: 'Feedback not found.' });
+
+    feedback.messages.push({
+      sender: req.user.role === 'admin' ? 'hr' : 'employee',
+      text
+    });
+    feedback.status = req.user.role === 'admin'
+      ? 'Responded'
+      : ['Responded', 'AI Auto Responded', 'Resolved'].includes(feedback.status)
+        ? 'Under Review'
+        : feedback.status;
+    await feedback.save();
+
+    const io = req.app.get('io');
+    if (io) io.emit('feedback:updated', { feedbackId: feedback._id });
+
+    res.status(201).json({ messages: feedback.messages });
+  } catch (error) {
+    console.error('Unable to add feedback conversation message:', error.code || error.name);
+    res.status(500).json({ message: 'Unable to send this message right now. Please try again.' });
   }
 };
 

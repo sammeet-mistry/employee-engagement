@@ -9,10 +9,30 @@ const mongoSanitize = require('express-mongo-sanitize');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 const { connectDB } = require('./utils/db');
 
+const defaultFrontendOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:5174',
+  'http://localhost:5175'
+];
+const frontendOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(',').map((origin) => {
+    try {
+      const parsedOrigin = new URL(origin.trim());
+      if (!['http:', 'https:'].includes(parsedOrigin.protocol) || parsedOrigin.username || parsedOrigin.password) {
+        throw new Error();
+      }
+      return parsedOrigin.origin;
+    } catch {
+      throw new Error('FRONTEND_URL must contain comma-separated HTTP or HTTPS frontend origins.');
+    }
+  })
+  : defaultFrontendOrigins;
+
 const app = express();
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
-  cors: { origin: process.env.FRONTEND_URL || ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'] }
+  cors: { origin: frontendOrigins, credentials: true }
 });
 app.set('io', io);
 io.on('connection', (socket) => {
@@ -23,7 +43,10 @@ io.on('connection', (socket) => {
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
+  origin: (origin, callback) => {
+    if (!origin || frontendOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Origin is not allowed by CORS.'));
+  },
   credentials: true
 }));
 app.use(mongoSanitize());

@@ -31,7 +31,11 @@ const AdminDashboard = () => {
       dispatch(fetchFeedbackStats());
     };
     socket.on('feedback:created', refreshFeedback);
-    return () => socket.off('feedback:created', refreshFeedback);
+    socket.on('feedback:updated', refreshFeedback);
+    return () => {
+      socket.off('feedback:created', refreshFeedback);
+      socket.off('feedback:updated', refreshFeedback);
+    };
   }, [dispatch, filters]);
 
   const handleFilterChange = (newFilters) => {
@@ -68,6 +72,11 @@ const AdminDashboard = () => {
     });
   };
 
+  const handleConversationUpdate = () => {
+    dispatch(fetchAllFeedback(filters));
+    dispatch(fetchFeedbackStats());
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-secondary-900">Admin Dashboard</h1>
@@ -89,6 +98,7 @@ const AdminDashboard = () => {
           onDelete={handleDelete}
           onGenerateAI={handleGenerateAI}
           onApproveReply={handleApproveReply}
+          onConversationUpdate={handleConversationUpdate}
         />
       </div>
 

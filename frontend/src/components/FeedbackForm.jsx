@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useSelector } from 'react-redux';
 
 const FeedbackForm = ({ onSubmit }) => {
-  const { loading } = useSelector((state) => state.feedback);
+  const { loading, error } = useSelector((state) => state.feedback);
   const [formData, setFormData] = useState({
     title: '',
     category: 'General',
@@ -20,27 +20,30 @@ const FeedbackForm = ({ onSubmit }) => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit(formData);
-    setFormData({
-      title: '',
-      category: 'General',
-      description: '',
-      anonymous: false,
-      priority: 'Medium',
-      department: '',
-    });
+    const submitted = await onSubmit(formData);
+    if (submitted) {
+      setFormData({
+        title: '',
+        category: 'General',
+        description: '',
+        anonymous: false,
+        priority: 'Medium',
+        department: '',
+      });
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-secondary-700 mb-1">
+        <label htmlFor="feedback-title" className="block text-sm font-medium text-secondary-700 mb-1">
           Title
         </label>
         <input
           type="text"
+          id="feedback-title"
           name="title"
           required
           className="input-field"
@@ -51,11 +54,12 @@ const FeedbackForm = ({ onSubmit }) => {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-secondary-700 mb-1">
+        <label htmlFor="feedback-category" className="block text-sm font-medium text-secondary-700 mb-1">
           Category
         </label>
         <select
           name="category"
+          id="feedback-category"
           className="input-field"
           value={formData.category}
           onChange={handleChange}
@@ -71,11 +75,12 @@ const FeedbackForm = ({ onSubmit }) => {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-secondary-700 mb-1">
+        <label htmlFor="feedback-description" className="block text-sm font-medium text-secondary-700 mb-1">
           Description
         </label>
         <textarea
           name="description"
+          id="feedback-description"
           required
           rows={4}
           className="input-field"
@@ -86,11 +91,12 @@ const FeedbackForm = ({ onSubmit }) => {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-secondary-700 mb-1">
+        <label htmlFor="feedback-priority" className="block text-sm font-medium text-secondary-700 mb-1">
           Priority
         </label>
         <select
           name="priority"
+          id="feedback-priority"
           className="input-field"
           value={formData.priority}
           onChange={handleChange}
@@ -103,12 +109,13 @@ const FeedbackForm = ({ onSubmit }) => {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-secondary-700 mb-1">
+        <label htmlFor="feedback-department" className="block text-sm font-medium text-secondary-700 mb-1">
           Department/Team (Optional)
         </label>
         <input
           type="text"
           name="department"
+          id="feedback-department"
           className="input-field"
           value={formData.department}
           onChange={handleChange}
@@ -129,6 +136,8 @@ const FeedbackForm = ({ onSubmit }) => {
           Submit anonymously
         </label>
       </div>
+
+      {error && <p className="text-sm text-error" role="alert">{error}</p>}
 
       <button
         type="submit"

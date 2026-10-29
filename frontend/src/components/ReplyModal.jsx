@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import axios from '../utils/axios';
 import { formatFullDateTime } from '../utils/date';
+import FeedbackConversation from './FeedbackConversation';
 
-const ReplyModal = ({ feedback, onClose, onGenerateAI, onApproveReply }) => {
+const ReplyModal = ({ feedback, onClose, onGenerateAI, onApproveReply, onConversationUpdate }) => {
   const [replies, setReplies] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingReplies, setLoadingReplies] = useState(true);
   const [editingReply, setEditingReply] = useState('');
   const [selectedReplyId, setSelectedReplyId] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -14,11 +16,14 @@ const ReplyModal = ({ feedback, onClose, onGenerateAI, onApproveReply }) => {
   }, [feedback._id]);
 
   const fetchReplies = async () => {
+    setLoadingReplies(true);
     try {
       const response = await axios.get(`/api/admin/replies/${feedback._id}`);
       setReplies(response.data);
     } catch (error) {
-      console.error('Error fetching replies:', error);
+      setErrorMessage(error.response?.data?.message || 'Unable to load previous replies.');
+    } finally {
+      setLoadingReplies(false);
     }
   };
 
@@ -29,7 +34,6 @@ const ReplyModal = ({ feedback, onClose, onGenerateAI, onApproveReply }) => {
       await onGenerateAI(feedback._id);
       await fetchReplies();
     } catch (error) {
-      console.error('Error generating AI reply:', error);
       setErrorMessage(error.message || 'Unable to generate a reply. Please try again.');
     } finally {
       setLoading(false);
@@ -115,13 +119,23 @@ const ReplyModal = ({ feedback, onClose, onGenerateAI, onApproveReply }) => {
             </button>
           </div>
 
+          <section className="mb-6 rounded-lg border border-secondary-200 p-4" aria-labelledby="feedback-conversation-title">
+            <h3 id="feedback-conversation-title" className="mb-3 text-lg font-semibold text-secondary-900">Conversation with employee</h3>
+            <FeedbackConversation
+              feedbackId={feedback._id}
+              initialMessages={feedback.messages}
+              isAdmin
+              onMessageSent={onConversationUpdate}
+            />
+          </section>
+
           <div className="mb-6">
             <button
               onClick={handleGenerateAI}
               disabled={loading}
               className="btn-primary mr-4"
             >
-              {loading ? 'Generating...' : 'Generate AI Reply'}
+              {loading ? 'Generating...' : 'Draft AI reply'}
             </button>
             {errorMessage && (
               <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -131,9 +145,11 @@ const ReplyModal = ({ feedback, onClose, onGenerateAI, onApproveReply }) => {
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-secondary-900">Replies</h3>
-            {replies.length === 0 ? (
-              <p className="text-secondary-500">No replies yet.</p>
+            <h3 className="text-lg font-semibold text-secondary-900">AI reply drafts and sent replies</h3>
+            {loadingReplies ? (
+              <p role="status" className="text-secondary-500">Loading replies...</p>
+            ) : replies.length === 0 ? (
+              <p className="text-secondary-500">No AI reply drafts or recorded replies.</p>
             ) : (
               replies.map((reply) => (
                 <div key={reply._id} className="border border-secondary-200 rounded-lg p-4">

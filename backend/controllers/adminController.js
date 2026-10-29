@@ -63,6 +63,9 @@ exports.approveAndSendReply = async (req, res) => {
     // Update feedback status
     await Feedback.findByIdAndUpdate(reply.feedbackId, { status: "Responded" });
 
+    const io = req.app.get('io');
+    if (io) io.emit('feedback:updated', { feedbackId: reply.feedbackId });
+
     res.json({ message: "Reply sent successfully" });
   } catch (err) {
     res.status(500).json({ message: "Server error" });

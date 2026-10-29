@@ -79,6 +79,23 @@ const feedbackSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  messages: [{
+    sender: {
+      type: String,
+      enum: ['employee', 'hr'],
+      required: true
+    },
+    text: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 4000
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   chatSession: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'ChatSession'

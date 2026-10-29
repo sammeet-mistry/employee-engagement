@@ -215,64 +215,6 @@ const summarizeQuestionnaire = async ({ category, title, description, priority, 
   }
 };
 
-const buildChatHistoryText = (messages) => {
-  return messages.map((message) => {
-    const label = message.sender === 'employee' ? 'Employee' : message.sender === 'ai' ? 'HR AI' : message.sender === 'system' ? 'System' : message.sender;
-    return `${label}: ${message.text}`;
-  }).join('\n');
-};
-
-const generateChatResponse = async (message, messages, scenarioContext) => {
-  try {
-    const history = buildChatHistoryText(messages);
-    const context = scenarioContext ? `\n\nRelevant scenario guidance:\nCategory: ${scenarioContext.category}\nResponse template: ${scenarioContext.responseTemplate || 'Use supportive, practical guidance.'}` : '';
-    const prompt = `You are an empathetic HR chatbot assistant. Use the employee's conversation history and latest question to respond with supportive workplace guidance, a constructive draft for HR, and a preview tone appropriate for a senior HR review. Keep the reply professional, concise, and formatted for the employee to read or send as a draft to HR.${context}\n\nConversation history:\n${history}\n\nEmployee: ${message}\nAssistant:`;
-    return await aiCreate(prompt, { temperature: 0.75, maxTokens: 450 });
-  } catch (error) {
-    console.error('AI Response Generation Error:', error.message);
-    // Fallback response when AI is not available
-    return `Thank you for reaching out. I've noted your concern about: "${message.substring(0, 100)}${message.length > 100 ? '...' : ''}". 
-
-This appears to be a workplace matter that would benefit from HR review. Here's a suggested draft you could send to HR:
-
----
-
-Dear HR Team,
-
-I wanted to bring to your attention: ${message}
-
-I would appreciate your guidance on how to address this situation.
-
-Best regards,
-[Your Name]
-
----
-
-Please review this draft before sending it to HR. If you'd like to modify it or discuss further, feel free to continue our conversation.`;
-  }
-};
-
-const summarizeChatSession = async (messages) => {
-  const history = buildChatHistoryText(messages);
-  const prompt = `You are an enterprise HR analyst. Summarize the employee's chat session with the HR assistant into a short issue summary, choose the most appropriate summary category, and suggest up to 5 tags. Return valid JSON only with {"aiSummary":"...","aiSummaryCategory":"...","aiSummaryTags":["tag1","tag2","tag3"]}.\n\nChat transcript:\n${history}`;
-  try {
-    const responseText = await aiCreate(prompt, { temperature: 0.4, maxTokens: 260 });
-    const parsed = parseJSON(responseText);
-    return {
-      aiSummary: parsed.aiSummary || 'Summary not available.',
-      aiSummaryCategory: parsed.aiSummaryCategory || 'General',
-      aiSummaryTags: Array.isArray(parsed.aiSummaryTags) ? parsed.aiSummaryTags : []
-    };
-  } catch (error) {
-    console.error('Chat Summary Generation Error:', error);
-    return {
-      aiSummary: 'Summary not available.',
-      aiSummaryCategory: 'General',
-      aiSummaryTags: []
-    };
-  }
-};
-
 module.exports = {
   QUESTION_BANK,
   selectQuestionSet,
@@ -280,7 +222,5 @@ module.exports = {
   analyzeSentiment,
   generateAIQuestions,
   refineFeedbackDraft,
-  summarizeQuestionnaire,
-  generateChatResponse,
-  summarizeChatSession
+  summarizeQuestionnaire
 };

@@ -1,6 +1,7 @@
 const express = require('express');
 const {
   submitFeedback,
+  addFeedbackMessage,
   getMyFeedback,
   getFeedbackWithReplies,
   getAllFeedback,
@@ -20,6 +21,7 @@ router.post('/ai-questions', auth, generateAIQuestions);
 router.post('/ai-refine', auth, refineAIFeedback);
 router.get('/my', auth, getMyFeedback);
 router.get('/my-with-replies', auth, getFeedbackWithReplies);
+router.post('/:id/messages', auth, addFeedbackMessage);
 
 // Admin routes
 router.get('/', auth, adminOnly, getAllFeedback);

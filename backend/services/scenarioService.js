@@ -3,7 +3,7 @@ const OpenAI = require('openai');
 const Scenario = require('../models/Scenario');
 const UnmatchedScenario = require('../models/UnmatchedScenario');
 
-const SAFETY_PATTERN = /\b(harass|harassment|threat|threatened|unsafe|violence|violent|assault|discriminat|retaliat|abuse|abusive|sexual\s+misconduct|self[- ]harm|suicid)\b/i;
+const SAFETY_PATTERN = /\b(?:harass\w*|threat\w*|unsafe|violence|violent|assault\w*|discriminat\w*|retaliat\w*|abus\w*|sexual\s+misconduct|self[-\s]?harm|suicid\w*|immediate\s+danger|in\s+danger|kill(?:ing)?\s+(?:myself|me)|hurt(?:ing)?\s+(?:myself|me)|harm(?:ing)?\s+(?:myself|me)|end\s+my\s+life|want\s+to\s+die)\b/i;
 const FALLBACK_DIMENSIONS = 64;
 const MAX_MESSAGE_LENGTH = 4000;
 
@@ -69,7 +69,7 @@ const recordUnmatchedScenario = async ({ rawMessage, sourceType = 'chat', source
   }
 };
 
-const categorizeMessage = async ({ message, sourceType = 'chat', sourceId } = {}) => {
+const categorizeMessage = async ({ message, sourceType = 'chat', sourceId, recordUnmatched = true } = {}) => {
   const normalizedMessage = String(message || '').trim().slice(0, MAX_MESSAGE_LENGTH);
   const safety = isSafetyMessage(normalizedMessage);
   if (!normalizedMessage) {
@@ -87,16 +87,23 @@ const categorizeMessage = async ({ message, sourceType = 'chat', sourceId } = {}
 
     const threshold = best?.scenario.confidenceThreshold ?? 0.75;
     if (!best || best.confidence < threshold) {
-      const unmatched = await recordUnmatchedScenario({ rawMessage: normalizedMessage, sourceType, sourceId, attemptedCategory: safety ? 'harassment_safety' : best?.scenario.category || 'other', confidenceScore: best?.confidence || 0 });
-      return { scenario: null, confidence: best?.confidence || 0, safety, unmatched };
+      const attemptedCategory = safety ? 'harassment_safety' : best?.scenario.category || 'other';
+      const confidenceScore = best?.confidence || 0;
+      const unmatched = recordUnmatched
+        ? await recordUnmatchedScenario({ rawMessage: normalizedMessage, sourceType, sourceId, attemptedCategory, confidenceScore })
+        : null;
+      return { scenario: null, confidence: confidenceScore, safety, unmatched, attemptedCategory, confidenceScore };
     }
 
     await Scenario.updateOne({ _id: best.scenario._id }, { $inc: { usageCount: 1 }, $set: { lastMatchedAt: new Date() } });
     return { scenario: best.scenario, confidence: best.confidence, safety };
   } catch (error) {
     console.error('Scenario categorization error:', error.message);
-    const unmatched = await recordUnmatchedScenario({ rawMessage: normalizedMessage, sourceType, sourceId, attemptedCategory: safety ? 'harassment_safety' : 'other', confidenceScore: 0 });
-    return { scenario: null, confidence: 0, safety, unmatched };
+    const attemptedCategory = safety ? 'harassment_safety' : 'other';
+    const unmatched = recordUnmatched
+      ? await recordUnmatchedScenario({ rawMessage: normalizedMessage, sourceType, sourceId, attemptedCategory, confidenceScore: 0 })
+      : null;
+    return { scenario: null, confidence: 0, safety, unmatched, attemptedCategory, confidenceScore: 0 };
   }
 };
 

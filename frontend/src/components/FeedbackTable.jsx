@@ -10,7 +10,8 @@ const FeedbackTable = ({
   onStatusUpdate,
   onDelete,
   onGenerateAI,
-  onApproveReply
+  onApproveReply,
+  onConversationUpdate
 }) => {
   const [selectedFeedback, setSelectedFeedback] = useState(null);
   const [showReplyModal, setShowReplyModal] = useState(false);
@@ -109,10 +110,11 @@ const FeedbackTable = ({
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex justify-end space-x-2">
                     <button
+                      type="button"
                       onClick={() => handleViewDetails(fb)}
                       className="text-primary-600 hover:text-primary-900"
                     >
-                      View
+                      {fb.messages?.length ? 'Open conversation' : 'Respond to feedback'}
                     </button>
                     <select
                       value={fb.status}
@@ -146,6 +148,7 @@ const FeedbackTable = ({
           onClose={() => setShowReplyModal(false)}
           onGenerateAI={onGenerateAI}
           onApproveReply={onApproveReply}
+          onConversationUpdate={onConversationUpdate}
         />
       )}
     </>
