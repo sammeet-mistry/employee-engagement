@@ -103,8 +103,8 @@ const AdminDashboard = () => {
       </div>
 
       <div className="card">
-        <h2 className="text-xl font-semibold text-secondary-900 mb-4">Employee Chat Sessions</h2>
-        <p className="text-secondary-600 mb-5">Access and manage employee HR chatbot conversations directly from the admin dashboard.</p>
+        <h2 className="text-xl font-semibold text-secondary-900 mb-4">Employee Chats</h2>
+        <p className="text-secondary-600 mb-5">View employee chats, reply in the same conversation, and delete open chats.</p>
         <AdminChatSessions />
       </div>
     </div>

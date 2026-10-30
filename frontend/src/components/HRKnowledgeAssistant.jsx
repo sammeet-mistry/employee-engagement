@@ -75,7 +75,19 @@ const HRKnowledgeAssistant = () => {
       }
     };
     socket.on('chat:session-updated', refreshSession);
-    return () => socket.off('chat:session-updated', refreshSession);
+    const handleSessionDeleted = ({ sessionId }) => {
+      setSessions((previous) => previous.filter((session) => session._id !== sessionId));
+      if (activeSessionRef.current?._id === sessionId) {
+        activeSessionRef.current = null;
+        setActiveSession(null);
+        setStatusMessage('HR deleted this open conversation. Start a new conversation to continue.');
+      }
+    };
+    socket.on('chat:session-deleted', handleSessionDeleted);
+    return () => {
+      socket.off('chat:session-updated', refreshSession);
+      socket.off('chat:session-deleted', handleSessionDeleted);
+    };
   }, [loadSessions]);
 
   useEffect(() => {
@@ -141,7 +153,11 @@ const HRKnowledgeAssistant = () => {
       updateSession(data);
       setMessage('');
       setRetryAction(null);
-      setStatusMessage('Your question was sent.');
+      setStatusMessage(data.deliveredToHr
+        ? 'Your message was sent to HR.'
+        : data.assistantAvailable === false
+        ? 'Your question was saved. The assistant is unavailable; you can send this conversation to HR for follow-up.'
+        : 'Your question was sent.');
     } catch (error) {
       setRetryAction('message');
       setErrorMessage(error.response?.data?.message || 'Unable to send your question. Your draft is still here so you can retry.');
@@ -163,7 +179,7 @@ const HRKnowledgeAssistant = () => {
       } else {
         const { data } = await axios.post(`/api/chat/session/${activeSession._id}/escalate`);
         updateSession(data);
-        setStatusMessage('Your conversation was marked for HR follow-up.');
+        setStatusMessage('Your conversation was sent to HR for follow-up and added to the Admin feedback queue.');
       }
       setRetryAction(null);
       setConfirmAction(null);
@@ -210,7 +226,7 @@ const HRKnowledgeAssistant = () => {
             <p>Answers from approved HR resources, when connected</p>
           </div>
         </div>
-        <span className="rag-privacy"><FiShield aria-hidden="true" /> Your conversations are private to your account</span>
+        <span className="rag-privacy"><FiShield aria-hidden="true" /> Visible to you and authorized HR administrators</span>
       </header>
 
       <div className="rag-chat-layout">
@@ -319,9 +335,9 @@ const HRKnowledgeAssistant = () => {
                 <div ref={messageEndRef} />
               </div>
 
-              {activeSession.status === 'active' ? (
+              {activeSession.status !== 'closed' ? (
                 <form className="rag-composer" onSubmit={sendMessage}>
-                  <label htmlFor="rag-question">Your question</label>
+                  <label htmlFor="rag-question">{activeSession.status === 'active' ? 'Your question' : 'Message HR'}</label>
                   <textarea
                     id="rag-question"
                     rows={3}
@@ -334,19 +350,19 @@ const HRKnowledgeAssistant = () => {
                     onKeyDown={(event) => {
                       if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) sendMessage(event);
                     }}
-                    placeholder="Ask a question about workplace resources…"
+                    placeholder={activeSession.status === 'active' ? 'Ask a question about workplace resources…' : 'Write a message to HR…'}
                     disabled={isSending}
                   />
                   <div className="rag-composer-footer">
                     <span>{message.length}/4000 · Ctrl+Enter to send</span>
                     <button className="rag-primary-button" type="submit" disabled={isSending || !message.trim()}>
-                      {isSending ? 'Sending…' : 'Send question'} <FiSend aria-hidden="true" />
+                      {isSending ? 'Sending…' : activeSession.status === 'active' ? 'Send question' : 'Send to HR'} <FiSend aria-hidden="true" />
                     </button>
                   </div>
                 </form>
               ) : (
                 <div className="rag-closed-note" role="status">
-                  This conversation is {getSessionLabel(activeSession.status).toLowerCase()}. Start a new conversation to ask another question.
+                  This conversation is closed. Start a new conversation to ask another question.
                 </div>
               )}
 
@@ -394,7 +410,7 @@ const HRKnowledgeAssistant = () => {
             <p id="rag-confirm-description">
               {confirmAction === 'send-to-hr'
                 ? 'Your questions and the assistant’s responses in this conversation will be added to your feedback history and made available to HR for follow-up.'
-                : 'This marks the conversation for HR review, but does not share the text in your unsent draft. To share details, submit feedback through My feedback or send a saved conversation to HR.'}
+                : 'Your saved conversation will be sent to HR for review and added to the Admin feedback queue. Any unsent draft will not be included.'}
             </p>
             <div className="rag-confirm-actions">
               <button type="button" className="rag-secondary-button" onClick={() => setConfirmAction(null)} disabled={isSending}>Cancel</button>

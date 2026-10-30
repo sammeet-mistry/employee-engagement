@@ -22,10 +22,13 @@ class RagAgentTimeoutError extends Error {
 }
 
 class RagAgentUpstreamError extends Error {
-  constructor() {
+  constructor(kind = 'upstream', statusCode, upstreamCode) {
     super('The HR knowledge assistant returned an invalid response or is unavailable.');
     this.name = 'RagAgentUpstreamError';
     this.code = 'RAG_AGENT_UPSTREAM_ERROR';
+    this.kind = kind;
+    this.statusCode = statusCode;
+    this.upstreamCode = upstreamCode;
   }
 }
 
@@ -84,21 +87,21 @@ const readAgentResponse = ({ endpoint, payload, headers, timeoutMs }) => new Pro
     response.on('error', () => reject(new RagAgentUpstreamError()));
     response.on('end', () => {
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        reject(new RagAgentUpstreamError());
+        reject(new RagAgentUpstreamError('http', response.statusCode));
         return;
       }
 
       try {
         resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
       } catch {
-        reject(new RagAgentUpstreamError());
+        reject(new RagAgentUpstreamError('invalid_json', response.statusCode));
       }
     });
   });
 
   request.setTimeout(timeoutMs, () => request.destroy(new RagAgentTimeoutError()));
   request.on('error', (error) => {
-    reject(error instanceof RagAgentTimeoutError ? error : new RagAgentUpstreamError());
+    reject(error instanceof RagAgentTimeoutError ? error : new RagAgentUpstreamError('transport', undefined, error.code));
   });
   request.end(payload);
 });
@@ -169,7 +172,7 @@ const queryHrKnowledgeBase = async ({ question }) => {
   });
 
   if (!response || typeof response.answer !== 'string' || !Array.isArray(response.sources)) {
-    throw new RagAgentUpstreamError();
+    throw new RagAgentUpstreamError('invalid_shape', 200);
   }
 
   classifyUpstreamAnswer(response.answer);

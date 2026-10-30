@@ -8,6 +8,7 @@ const {
   getChatSession,
   addChatMessage,
   addAdminMessage,
+  deleteChatSession,
   sendChatToHR,
   escalateChatSession
 } = require('../controllers/chatController');
@@ -21,6 +22,7 @@ router.get('/session/:sessionId', getChatSession);
 router.post('/session', createChatSession);
 router.post('/session/:sessionId/message', addChatMessage);
 router.post('/session/:sessionId/admin-message', adminOnly, addAdminMessage);
+router.delete('/session/:sessionId', adminOnly, deleteChatSession);
 router.post('/session/:sessionId/send-to-hr', sendChatToHR);
 router.post('/session/:sessionId/escalate', escalateChatSession);
 
