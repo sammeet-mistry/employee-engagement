@@ -190,10 +190,9 @@ The root `vercel.json` configures two services in one Vercel project: `employee-
 | `MONGODB_URI` | Atlas connection string for the application database |
 | `SESSION_SECRET` | Long, random secret; generate a unique value |
 | `SOCKET_TOKEN_SECRET` | A different long, random secret |
-| `FRONTEND_URL` | Exact stable Vercel production origin, e.g. `https://your-project.vercel.app` |
 | `FEEDBACK_SLA_HOURS` | `72` or another value from 1 through 720 |
 
-Set `FRONTEND_URL` to the stable production `.vercel.app` origin, without a path or trailing slash. The backend also allows the current deployment's `VERCEL_URL` origin, which supports preview deployments. Do not set `VITE_API_URL` on Vercel; production Socket.IO uses the same Vercel origin and `/api/socket.io`.
+The backend automatically allows Vercel's `VERCEL_PROJECT_PRODUCTION_URL` and current deployment's `VERCEL_URL`, so no `FRONTEND_URL` setting is required for the Vercel project. If you add a custom frontend domain later, set `FRONTEND_URL` to its exact HTTPS origin. Do not set `VITE_API_URL` on Vercel; production Socket.IO uses the same Vercel origin and `/api/socket.io`.
 
 Optional feedback-related AI features can use server-side `AI_PROVIDER=gemini`, `GEMINI_API_KEY`, and `GEMINI_MODEL=gemini-2.0-flash`. Never expose API keys in `VITE_*` variables.
 

@@ -37,9 +37,13 @@ const configuredFrontendOrigins = process.env.FRONTEND_URL
 const deploymentOrigin = process.env.VERCEL_URL
   ? new URL(`https://${process.env.VERCEL_URL}`).origin
   : null;
+const productionOrigin = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? new URL(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`).origin
+  : null;
 const frontendOrigins = [...new Set([
   ...configuredFrontendOrigins,
-  ...(deploymentOrigin ? [deploymentOrigin] : [])
+  ...(deploymentOrigin ? [deploymentOrigin] : []),
+  ...(productionOrigin ? [productionOrigin] : [])
 ])];
 
 const app = express();
