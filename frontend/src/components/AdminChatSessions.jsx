@@ -3,6 +3,7 @@ import { FiTrash2 } from 'react-icons/fi';
 import axios from '../utils/axios';
 import { formatFullDateTime } from '../utils/date';
 import socket from '../utils/socket';
+import Pagination from './Pagination';
 
 const AdminChatSessions = () => {
   const [sessions, setSessions] = useState([]);
@@ -11,26 +12,35 @@ const AdminChatSessions = () => {
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
 
   useEffect(() => {
-    fetchSessions();
+    fetchSessions(page);
     socket.connect();
-    const refreshSessions = () => fetchSessions();
+    const refreshSessions = () => fetchSessions(page);
     socket.on('chat:session-updated', refreshSessions);
     socket.on('chat:session-deleted', refreshSessions);
     return () => {
       socket.off('chat:session-updated', refreshSessions);
       socket.off('chat:session-deleted', refreshSessions);
     };
-  }, []);
+  }, [page]);
 
-  const fetchSessions = async () => {
+  const fetchSessions = async (sessionPage) => {
     try {
-      const { data } = await axios.get('/api/chat/sessions/all');
-      setSessions(data);
+      const { data } = await axios.get('/api/chat/sessions/all', {
+        params: { page: sessionPage, limit: 10 }
+      });
+      setSessions(data.items);
+      setPagination(data.pagination);
+      const lastPage = Math.max(1, data.pagination.totalPages);
+      if (sessionPage > lastPage) {
+        setPage(lastPage);
+      }
       setActiveSession((current) => current
-        ? data.find((session) => session._id === current._id) || data[0] || null
-        : data[0] || null);
+        ? data.items.find((session) => session._id === current._id) || data.items[0] || null
+        : data.items[0] || null);
     } catch (error) {
       console.error(error);
     }
@@ -92,7 +102,7 @@ const AdminChatSessions = () => {
         <div className="w-full lg:w-80">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-secondary-900">Employee Chats</h2>
-            <span className="text-xs text-secondary-500">{sessions.length} sessions</span>
+            <span className="text-xs text-secondary-500">{pagination.total} sessions</span>
           </div>
           <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
             {sessions.map((session) => (
@@ -168,6 +178,14 @@ const AdminChatSessions = () => {
                     </div>
                   ))}
                 </div>
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  total={pagination.total}
+                  limit={pagination.limit}
+                  onPageChange={setPage}
+                  label="chat sessions"
+                />
 
                 <div className="space-y-3">
                   <textarea

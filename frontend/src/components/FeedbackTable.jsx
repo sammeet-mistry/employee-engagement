@@ -11,7 +11,9 @@ const FeedbackTable = ({
   onDelete,
   onGenerateAI,
   onApproveReply,
-  onConversationUpdate
+  onConversationUpdate,
+  admins = [],
+  onAssignmentChange
 }) => {
   const [selectedFeedback, setSelectedFeedback] = useState(null);
   const [showReplyModal, setShowReplyModal] = useState(false);
@@ -64,6 +66,9 @@ const FeedbackTable = ({
                 Submitted By
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
+                HR owner / SLA
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
                 Date
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-secondary-500 uppercase tracking-wider">
@@ -103,6 +108,33 @@ const FeedbackTable = ({
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
                   {fb.anonymous ? 'Anonymous' : fb.submittedBy?.name || 'Unknown'}
+                </td>
+                <td className="px-6 py-4 text-sm text-secondary-600">
+                  <select
+                    className="max-w-40 rounded border border-secondary-300 px-2 py-1 text-xs"
+                    value={fb.assignedTo?._id || ''}
+                    onChange={(event) => onAssignmentChange(fb._id, event.target.value)}
+                    aria-label={`Assign ${fb.title}`}
+                  >
+                    <option value="">Unassigned</option>
+                    {admins.map((admin) => (
+                      <option key={admin._id} value={admin._id}>{admin.name}</option>
+                    ))}
+                  </select>
+                  {fb.responseDueAt && (
+                    <div className={`mt-1 text-xs ${
+                      !['Responded', 'Resolved', 'AI Auto Responded'].includes(fb.status)
+                      && new Date(fb.responseDueAt).getTime() < Date.now()
+                        ? 'font-medium text-red-700'
+                        : 'text-secondary-500'
+                    }`}>
+                      {!['Responded', 'Resolved', 'AI Auto Responded'].includes(fb.status)
+                        && new Date(fb.responseDueAt).getTime() < Date.now()
+                        ? 'Overdue · '
+                        : 'Due · '}
+                      {formatFullDateTime(fb.responseDueAt)}
+                    </div>
+                  )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
                   {formatFullDateTime(fb.createdAt)}

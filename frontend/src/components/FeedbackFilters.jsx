@@ -1,12 +1,13 @@
 import { useState } from 'react';
 
-const FeedbackFilters = ({ onFilterChange }) => {
+const FeedbackFilters = ({ onFilterChange, admins = [] }) => {
   const [filters, setFilters] = useState({
     category: '',
     priority: '',
     status: '',
     department: '',
     anonymous: '',
+    assignedTo: '',
     search: '',
   });
 
@@ -24,6 +25,7 @@ const FeedbackFilters = ({ onFilterChange }) => {
       status: '',
       department: '',
       anonymous: '',
+      assignedTo: '',
       search: '',
     };
     setFilters(clearedFilters);
@@ -133,6 +135,24 @@ const FeedbackFilters = ({ onFilterChange }) => {
             <option value="">All</option>
             <option value="true">Anonymous only</option>
             <option value="false">Identified only</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-secondary-700 mb-1">
+            Assigned HR
+          </label>
+          <select
+            name="assignedTo"
+            className="input-field"
+            value={filters.assignedTo}
+            onChange={handleChange}
+          >
+            <option value="">All assignments</option>
+            <option value="unassigned">Unassigned</option>
+            {admins.map((admin) => (
+              <option key={admin._id} value={admin._id}>{admin.name}</option>
+            ))}
           </select>
         </div>
       </div>

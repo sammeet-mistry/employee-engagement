@@ -1,29 +1,25 @@
 import axios from 'axios';
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5002',
+  baseURL: '',
 });
 
-// Add request interceptor to include auth token
 apiClient.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  async (config) => {
+    if (['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase())) {
+      const { data } = await apiClient.get('/api/auth/csrf');
+      config.headers['X-CSRF-Token'] = data.csrfToken;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
 );
 
-// Add response interceptor to handle auth errors
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
+    const requestUrl = error.config?.url || '';
+    const isSessionBootstrap = requestUrl.endsWith('/auth/profile');
+    if (error.response?.status === 401 && !isSessionBootstrap) {
       window.location.href = '/login';
     }
     return Promise.reject(error);

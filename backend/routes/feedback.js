@@ -5,7 +5,9 @@ const {
   getMyFeedback,
   getFeedbackWithReplies,
   getAllFeedback,
+  exportFeedbackCsv,
   updateFeedbackStatus,
+  updateFeedbackAssignment,
   deleteFeedback,
   generateAIQuestions,
   refineAIFeedback
@@ -24,8 +26,10 @@ router.get('/my-with-replies', auth, getFeedbackWithReplies);
 router.post('/:id/messages', auth, addFeedbackMessage);
 
 // Admin routes
+router.get('/export.csv', auth, adminOnly, exportFeedbackCsv);
 router.get('/', auth, adminOnly, getAllFeedback);
 router.patch('/:id/status', auth, adminOnly, updateFeedbackStatus);
+router.patch('/:id/assignment', auth, adminOnly, updateFeedbackAssignment);
 router.delete('/:id', auth, adminOnly, deleteFeedback);
 
 module.exports = router;

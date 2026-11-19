@@ -15,6 +15,7 @@ import {
 import { fetchMyFeedbackWithReplies, submitFeedback } from '../store/slices/feedbackSlice';
 import FeedbackForm from '../components/FeedbackForm';
 import FeedbackList from '../components/FeedbackList';
+import Pagination from '../components/Pagination';
 import AIQuestionnaire from '../components/AIQuestionnaire';
 import HRKnowledgeAssistant from '../components/HRKnowledgeAssistant';
 import socket from '../utils/socket';
@@ -39,49 +40,46 @@ const EmployeeDashboard = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All statuses');
   const [sortOrder, setSortOrder] = useState('newest');
+  const [myFeedbackPage, setMyFeedbackPage] = useState(1);
   const [actionMessage, setActionMessage] = useState('');
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
-  const { myFeedback, loading, fetchError } = useSelector((state) => state.feedback);
+  const { myFeedback, myFeedbackPagination, loading, fetchError } = useSelector((state) => state.feedback);
+
+  const feedbackParams = useMemo(() => ({
+    page: myFeedbackPage,
+    limit: 10,
+    search,
+    status: statusFilter,
+    sortOrder
+  }), [myFeedbackPage, search, sortOrder, statusFilter]);
 
   useEffect(() => {
-    dispatch(fetchMyFeedbackWithReplies());
-  }, [dispatch]);
+    const timer = setTimeout(() => {
+      dispatch(fetchMyFeedbackWithReplies(feedbackParams));
+    }, search.trim() ? 250 : 0);
+    return () => clearTimeout(timer);
+  }, [dispatch, feedbackParams, search]);
 
   useEffect(() => {
     socket.connect();
-    const refreshFeedback = () => dispatch(fetchMyFeedbackWithReplies());
+    const refreshFeedback = () => dispatch(fetchMyFeedbackWithReplies(feedbackParams));
     socket.on('feedback:created', refreshFeedback);
     socket.on('feedback:updated', refreshFeedback);
     return () => {
       socket.off('feedback:created', refreshFeedback);
       socket.off('feedback:updated', refreshFeedback);
     };
-  }, [dispatch]);
+  }, [dispatch, feedbackParams]);
 
-  const feedbackCounts = useMemo(() => ({
-    total: myFeedback.length,
-    inReview: myFeedback.filter((item) => ['Pending', 'In review'].includes(getFeedbackStatus(item))).length,
-    responded: myFeedback.filter((item) => getFeedbackStatus(item) === 'Responded').length
-  }), [myFeedback]);
-
-  const filteredFeedback = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return [...myFeedback]
-      .filter((item) => statusFilter === 'All statuses' || getFeedbackStatus(item) === statusFilter)
-      .filter((item) => !query || [item.title, item.description, item.category].some((value) => String(value || '').toLowerCase().includes(query)))
-      .sort((left, right) => {
-        const difference = new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
-        return sortOrder === 'newest' ? difference : -difference;
-      });
-  }, [myFeedback, search, sortOrder, statusFilter]);
+  const feedbackCounts = myFeedbackPagination.summary || { total: 0, inReview: 0, responded: 0 };
 
   const handleSubmitFeedback = async (feedbackData, showGlobalSuccess = true) => {
     try {
       await dispatch(submitFeedback(feedbackData)).unwrap();
       setShowForm(false);
       if (showGlobalSuccess) setActionMessage('Your feedback has been submitted.');
-      await dispatch(fetchMyFeedbackWithReplies());
+      await dispatch(fetchMyFeedbackWithReplies(feedbackParams));
       return true;
     } catch {
       setActionMessage('');
@@ -94,7 +92,7 @@ const EmployeeDashboard = () => {
     setShowForm((visible) => !visible);
   };
 
-  const latestFeedback = myFeedback[0];
+  const latestFeedback = feedbackCounts.latest || myFeedback[0];
   const displayName = user?.name?.trim().split(/\s+/)[0] || 'there';
   const feedbackLoaded = !loading && !fetchError;
   const latestFeedbackLabel = loading ? 'Loading activity…' : fetchError ? 'Activity unavailable' : latestFeedback?.title || 'Your story starts here';
@@ -272,17 +270,30 @@ const EmployeeDashboard = () => {
           <section className="employee-panel employee-history-panel" aria-labelledby="feedback-history-title">
             <div className="employee-panel-heading">
               <div><span className="employee-panel-kicker">SUBMISSION HISTORY</span><h2 id="feedback-history-title">Your feedback</h2></div>
-              <span className="employee-count">{myFeedback.length} {myFeedback.length === 1 ? 'entry' : 'entries'}</span>
+              <span className="employee-count">{myFeedbackPagination.total} {myFeedbackPagination.total === 1 ? 'entry' : 'entries'}</span>
             </div>
             <div className="employee-feedback-controls">
               <label className="employee-search">
                 <FiSearch aria-hidden="true" />
                 <span className="sr-only">Search feedback</span>
-                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search title, category, or details" />
+                <input
+                  value={search}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setMyFeedbackPage(1);
+                  }}
+                  placeholder="Search title, category, or details"
+                />
               </label>
               <label className="employee-select-control">
                 <span className="sr-only">Filter by status</span>
-                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                <select
+                  value={statusFilter}
+                  onChange={(event) => {
+                    setStatusFilter(event.target.value);
+                    setMyFeedbackPage(1);
+                  }}
+                >
                   <option>All statuses</option>
                   <option>Pending</option>
                   <option>In review</option>
@@ -291,19 +302,33 @@ const EmployeeDashboard = () => {
               </label>
               <label className="employee-select-control">
                 <span className="sr-only">Sort feedback</span>
-                <select value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}>
+                <select
+                  value={sortOrder}
+                  onChange={(event) => {
+                    setSortOrder(event.target.value);
+                    setMyFeedbackPage(1);
+                  }}
+                >
                   <option value="newest">Newest first</option>
                   <option value="oldest">Oldest first</option>
                 </select>
               </label>
             </div>
             <FeedbackList
-              feedback={filteredFeedback}
+              feedback={myFeedback}
               loading={loading}
               error={fetchError}
               showReplies
-              onRetry={() => dispatch(fetchMyFeedbackWithReplies())}
+              onRetry={() => dispatch(fetchMyFeedbackWithReplies(feedbackParams))}
               isFiltered={Boolean(search || statusFilter !== 'All statuses')}
+            />
+            <Pagination
+              page={myFeedbackPagination.page}
+              totalPages={myFeedbackPagination.totalPages}
+              total={myFeedbackPagination.total}
+              limit={myFeedbackPagination.limit}
+              onPageChange={setMyFeedbackPage}
+              label="feedback"
             />
           </section>
         </main>

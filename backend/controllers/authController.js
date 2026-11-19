@@ -1,13 +1,43 @@
 const User = require("../models/User");
-const jwt = require("jsonwebtoken");
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const { validationResult } = require("express-validator");
 
-const generateToken = (user) => {
-  return jwt.sign(
-    { id: user._id, email: user.email, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRE }
+const getSafeUser = (user) => ({
+  id: user._id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  department: user.department
+});
+
+const startSession = (req, user) => new Promise((resolve, reject) => {
+  req.session.regenerate((error) => {
+    if (error) return reject(error);
+    req.session.user = { id: user._id.toString() };
+    req.session.csrfToken = crypto.randomBytes(32).toString('hex');
+    req.session.save((saveError) => (saveError ? reject(saveError) : resolve()));
+  });
+});
+
+exports.getCsrfToken = (req, res) => {
+  if (!req.session.csrfToken) {
+    req.session.csrfToken = crypto.randomBytes(32).toString('hex');
+  }
+  res.json({ csrfToken: req.session.csrfToken });
+};
+
+exports.getSocketToken = (req, res) => {
+  if (!process.env.SOCKET_TOKEN_SECRET) {
+    return res.status(503).json({ message: 'Realtime authentication is not configured.' });
+  }
+
+  const token = jwt.sign(
+    { sub: req.user.id, role: req.user.role, purpose: 'socket' },
+    process.env.SOCKET_TOKEN_SECRET,
+    { algorithm: 'HS256', expiresIn: '60s', issuer: 'employee-engagement' }
   );
+  res.json({ token });
 };
 
 exports.register = async (req, res) => {
@@ -33,17 +63,8 @@ exports.register = async (req, res) => {
     });
     await user.save();
 
-    const token = generateToken(user);
-    res.status(201).json({
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        department: user.department
-      }
-    });
+    await startSession(req, user);
+    res.status(201).json({ user: getSafeUser(user) });
   } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
@@ -56,39 +77,42 @@ exports.login = async (req, res) => {
   }
 
   const { email, password } = req.body;
-  console.log("Login attempt for email:", email);
-
   try {
     const user = await User.findOne({ email });
-    console.log("User found:", user ? "yes" : "no");
     if (!user) {
-      console.log("User not found");
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
     const isMatch = await user.comparePassword(password);
-    console.log("Password match:", isMatch);
     if (!isMatch) {
-      console.log("Password does not match");
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    const token = generateToken(user);
-    console.log("Login successful for user:", user.email, "role:", user.role);
-    res.json({
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        department: user.department
-      }
-    });
+    await startSession(req, user);
+    res.json({ user: getSafeUser(user) });
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ message: "Server error" });
   }
+};
+
+exports.logout = (req, res) => {
+  const io = req.app.get('io');
+  if (io) io.in(`user:${req.user.id}`).disconnectSockets(true);
+
+  req.session.destroy((error) => {
+    if (error) {
+      console.error('Unable to destroy session:', error);
+      return res.status(500).json({ message: 'Unable to sign out right now.' });
+    }
+
+    res.clearCookie('employee.sid', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax'
+    });
+    res.json({ message: 'Signed out successfully.' });
+  });
 };
 
 exports.getProfile = async (req, res) => {

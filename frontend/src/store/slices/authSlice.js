@@ -8,7 +8,6 @@ export const login = createAsyncThunk(
   async ({ email, password }, { rejectWithValue }) => {
     try {
       const response = await axios.post(`${API_URL}/login`, { email, password });
-      localStorage.setItem('token', response.data.token);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message || 'Unable to sign in. Check that the backend is running.');
@@ -21,7 +20,6 @@ export const register = createAsyncThunk(
   async (userData, { rejectWithValue }) => {
     try {
       const response = await axios.post(`${API_URL}/register`, userData);
-      localStorage.setItem('token', response.data.token);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message || 'Unable to create your account.');
@@ -33,13 +31,21 @@ export const getProfile = createAsyncThunk(
   'auth/getProfile',
   async (_, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/profile`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(`${API_URL}/profile`);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message || 'Unable to load your profile.');
+    }
+  }
+);
+
+export const logout = createAsyncThunk(
+  'auth/logout',
+  async (_, { rejectWithValue }) => {
+    try {
+      await axios.post(`${API_URL}/logout`);
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message || 'Unable to sign out from the server.');
     }
   }
 );
@@ -48,17 +54,12 @@ const authSlice = createSlice({
   name: 'auth',
   initialState: {
     user: null,
-    token: localStorage.getItem('token'),
-    loading: false,
+    isAuthenticated: false,
+    sessionChecked: false,
+    loading: true,
     error: null,
   },
   reducers: {
-    logout: (state) => {
-      localStorage.removeItem('token');
-      state.user = null;
-      state.token = null;
-      state.error = null;
-    },
     clearError: (state) => {
       state.error = null;
     },
@@ -72,7 +73,8 @@ const authSlice = createSlice({
       .addCase(login.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload.user;
-        state.token = action.payload.token;
+        state.isAuthenticated = true;
+        state.sessionChecked = true;
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
@@ -85,7 +87,8 @@ const authSlice = createSlice({
       .addCase(register.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload.user;
-        state.token = action.payload.token;
+        state.isAuthenticated = true;
+        state.sessionChecked = true;
       })
       .addCase(register.rejected, (state, action) => {
         state.loading = false;
@@ -97,13 +100,31 @@ const authSlice = createSlice({
       .addCase(getProfile.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload;
+        state.isAuthenticated = true;
+        state.sessionChecked = true;
       })
       .addCase(getProfile.rejected, (state, action) => {
         state.loading = false;
+        state.user = null;
+        state.isAuthenticated = false;
+        state.sessionChecked = true;
+        state.error = action.payload;
+      })
+      .addCase(logout.pending, (state) => {
+        state.loggingOut = true;
+        state.error = null;
+      })
+      .addCase(logout.fulfilled, (state) => {
+        state.loggingOut = false;
+        state.user = null;
+        state.isAuthenticated = false;
+      })
+      .addCase(logout.rejected, (state, action) => {
+        state.loggingOut = false;
         state.error = action.payload;
       });
   },
 });
 
-export const { logout, clearError } = authSlice.actions;
+export const { clearError } = authSlice.actions;
 export default authSlice.reducer;

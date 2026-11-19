@@ -6,6 +6,8 @@ const {
   RagAgentTimeoutError
 } = require('../services/ragAgentService');
 const { categorizeMessage, recordUnmatchedScenario } = require('../services/scenarioService');
+const { emitFeedbackEvent, emitSessionEvent } = require('../utils/realtime');
+const { parsePagination, createPagination } = require('../utils/pagination');
 
 const MAX_MESSAGE_LENGTH = 4000;
 const allowedCategories = ['General', 'Work Environment', 'Management', 'Compensation', 'Benefits', 'Career Development', 'Other'];
@@ -13,8 +15,8 @@ const allowedCategories = ['General', 'Work Environment', 'Management', 'Compens
 const emitSessionUpdate = (req, session, result) => {
   const io = req.app.get('io');
   if (!io) return;
-  io.emit('chat:session-updated', { sessionId: session._id });
-  if (result?.unmatched) io.emit('scenario:unmatched', { unmatchedId: result.unmatched._id });
+  emitSessionEvent(io, 'chat:session-updated', session);
+  if (result?.unmatched) io.to('admins').emit('scenario:unmatched', { unmatchedId: result.unmatched._id });
 };
 
 const addScenarioEscalation = (session) => {
@@ -56,8 +58,17 @@ const createChatSession = async (req, res) => {
 
 const getUserChatSessions = async (req, res) => {
   try {
-    const sessions = await ChatSession.find({ user: req.user.id }).sort({ updatedAt: -1 });
-    res.json(sessions);
+    const { page, limit, skip } = parsePagination(req.query, 10);
+    const query = { user: req.user.id };
+    const [sessions, total] = await Promise.all([
+      ChatSession.find(query)
+        .select({ messages: { $slice: -1 } })
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      ChatSession.countDocuments(query)
+    ]);
+    res.json({ items: sessions, pagination: createPagination(page, limit, total) });
   } catch (error) {
     console.error('Unable to load employee chat sessions:', error.code || error.name);
     res.status(500).json({ message: 'Unable to load your conversations right now. Please try again.' });
@@ -66,10 +77,17 @@ const getUserChatSessions = async (req, res) => {
 
 const getAllChatSessions = async (req, res) => {
   try {
-    const sessions = await ChatSession.find()
-      .populate('user', 'name email department')
-      .sort({ updatedAt: -1 });
-    res.json(sessions);
+    const { page, limit, skip } = parsePagination(req.query, 10);
+    const [sessions, total] = await Promise.all([
+      ChatSession.find()
+        .select({ messages: { $slice: -1 } })
+        .populate('user', 'name email department')
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      ChatSession.countDocuments()
+    ]);
+    res.json({ items: sessions, pagination: createPagination(page, limit, total) });
   } catch (error) {
     console.error('Unable to load admin chat sessions:', error.code || error.name);
     res.status(500).json({ message: 'Unable to load conversations right now.' });
@@ -90,7 +108,7 @@ const syncFollowUpFeedback = async (req, session, message, sender) => {
     else if (['Responded', 'AI Auto Responded', 'Resolved'].includes(feedback.status)) feedback.status = 'Under Review';
     await feedback.save();
     const io = req.app.get('io');
-    if (io) io.emit('feedback:updated', { feedbackId: feedback._id });
+    if (io) emitFeedbackEvent(io, 'feedback:updated', feedback);
   } catch (error) {
     console.error('Unable to sync chat message to HR follow-up:', error.code || error.name);
   }
@@ -251,7 +269,7 @@ const deleteChatSession = async (req, res) => {
 
     await session.deleteOne();
     const io = req.app.get('io');
-    if (io) io.emit('chat:session-deleted', { sessionId: session._id });
+    if (io) emitSessionEvent(io, 'chat:session-deleted', session);
     res.json({ message: 'Open chat deleted.' });
   } catch (error) {
     console.error('Unable to delete employee chat:', error.code || error.name);
@@ -290,7 +308,7 @@ const sendChatToHR = async (req, res) => {
     emitSessionUpdate(req, session);
 
     const io = req.app.get('io');
-    if (io) io.emit('feedback:created', { feedbackId: feedback._id });
+    if (io) emitFeedbackEvent(io, 'feedback:created', feedback);
     res.json({ session, feedback });
   } catch (error) {
     console.error('Unable to send conversation to HR:', error.code || error.name);
@@ -334,7 +352,7 @@ const escalateChatSession = async (req, res) => {
     await session.save();
     emitSessionUpdate(req, session);
     const io = req.app.get('io');
-    if (io && feedback) io.emit('feedback:created', { feedbackId: feedback._id });
+    if (io && feedback) emitFeedbackEvent(io, 'feedback:created', feedback);
     res.json(session);
   } catch (error) {
     console.error('Unable to request HR follow-up:', error.code || error.name);

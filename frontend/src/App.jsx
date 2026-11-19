@@ -16,16 +16,14 @@ import LoadingSpinner from './components/LoadingSpinner';
 
 function App() {
   const dispatch = useDispatch();
-  const { user, token, loading } = useSelector((state) => state.auth);
+  const { user, sessionChecked } = useSelector((state) => state.auth);
   const location = useLocation();
 
   useEffect(() => {
-    if (token && !user) {
-      dispatch(getProfile());
-    }
-  }, [dispatch, token, user]);
+    dispatch(getProfile());
+  }, [dispatch]);
 
-  if (loading && token) {
+  if (!sessionChecked) {
     return <LoadingSpinner />;
   }
 

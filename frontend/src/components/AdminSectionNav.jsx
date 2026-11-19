@@ -8,25 +8,46 @@ const AdminSectionNav = () => {
   const navigate = useNavigate();
   const [pendingReviews, setPendingReviews] = useState(0);
   const [scenarioCount, setScenarioCount] = useState(0);
+  const [assignedFeedback, setAssignedFeedback] = useState(0);
+  const [assignmentNotice, setAssignmentNotice] = useState('');
+  const [countError, setCountError] = useState('');
 
   const loadCounts = async () => {
     try {
-      const [{ data: scenarios }, { data: unmatched }] = await Promise.all([
+      const [{ data: scenarios }, { data: unmatched }, { data: assigned }] = await Promise.all([
         axios.get('/api/admin/scenarios'),
-        axios.get('/api/admin/unmatched-scenarios?status=pending_review')
+        axios.get('/api/admin/unmatched-scenarios?status=pending_review'),
+        axios.get('/api/admin/assigned-feedback-count')
       ]);
       setScenarioCount(scenarios.length);
       setPendingReviews(unmatched.length);
+      setAssignedFeedback(assigned.count);
+      setCountError('');
     } catch (error) {
-      // The destination pages provide the detailed error state.
+      console.error('Unable to load admin navigation counts:', error.message);
+      setCountError(error.response?.data?.message || 'Admin navigation counts are unavailable.');
     }
   };
 
   useEffect(() => {
+    let noticeTimeout;
     loadCounts();
     socket.connect();
     socket.on('scenario:unmatched', loadCounts);
-    return () => socket.off('scenario:unmatched', loadCounts);
+    const handleAssignment = () => {
+      setAssignmentNotice('A feedback item was assigned to you.');
+      window.clearTimeout(noticeTimeout);
+      noticeTimeout = window.setTimeout(() => setAssignmentNotice(''), 5000);
+      loadCounts();
+    };
+    socket.on('feedback:assignment', handleAssignment);
+    socket.on('feedback:updated', loadCounts);
+    return () => {
+      socket.off('scenario:unmatched', loadCounts);
+      socket.off('feedback:assignment', handleAssignment);
+      socket.off('feedback:updated', loadCounts);
+      window.clearTimeout(noticeTimeout);
+    };
   }, []);
 
   const sections = [
@@ -37,6 +58,15 @@ const AdminSectionNav = () => {
 
   return (
     <nav aria-label="Admin sections" className="flex w-full flex-wrap items-center gap-1 sm:w-auto sm:gap-2">
+      {assignedFeedback > 0 && (
+        <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800" role="status">
+          {assignedFeedback} assigned
+        </span>
+      )}
+      {assignmentNotice && (
+        <span className="sr-only" role="status">{assignmentNotice}</span>
+      )}
+      {countError && <span className="sr-only" role="alert">{countError}</span>}
       {sections.map((section) => {
         const active = location.pathname === section.path;
         return (

@@ -79,6 +79,14 @@ const feedbackSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  assignedTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  responseDueAt: {
+    type: Date
+  },
   messages: [{
     sender: {
       type: String,

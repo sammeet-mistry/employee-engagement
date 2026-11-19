@@ -145,24 +145,13 @@ const analyzeSentiment = async (text) => {
   }
 };
 
-const generateAIQuestions = async ({ category, title, description, priority, department }) => {
+const generateAIQuestions = ({ category, title, description }) => {
   const selectedCategory = QUESTION_CATEGORIES.includes(category) ? category : 'General';
   const selectedQuestions = selectQuestionSet({ category: selectedCategory, title, description });
-  const prompt = `You are an HR assistant that creates helpful questionnaire prompts for employees preparing feedback. Based on the draft details below, return valid JSON only with the keys {"intro":"text","questions":["question1","question2", ...]}.\n\nDraft:\nTitle: ${title || 'No title provided'}\nCategory: ${category || 'General'}\nPriority: ${priority || 'Medium'}\nDepartment: ${department || 'Not specified'}\nDescription: ${description || 'No draft description yet'}`;
-  try {
-    const responseText = await aiCreate(prompt, { temperature: 0.5, maxTokens: 260 });
-    const parsed = parseJSON(responseText);
-    return {
-      intro: parsed.intro || 'Answer these questions to refine your feedback.',
-      questions: selectedQuestions
-    };
-  } catch (error) {
-    console.error('AI Questionnaire Generation Error:', error);
-    return {
-      intro: 'Answer the questions below to improve your feedback.',
-      questions: selectedQuestions
-    };
-  }
+  return {
+    intro: 'Answer these questions to add useful context to your feedback.',
+    questions: selectedQuestions
+  };
 };
 
 const refineFeedbackDraft = async ({ category, title, answers, priority, department }) => {
@@ -190,6 +179,17 @@ const refineFeedbackDraft = async ({ category, title, answers, priority, departm
 
 const summarizeQuestionnaire = async ({ category, title, description, priority, department, answers }) => {
   const answerText = Object.entries(answers || {}).map(([question, answer]) => `Q: ${question}\nA: ${answer}`).join('\n\n');
+  if (!answerText.trim()) {
+    const mood = detectMood(description || '');
+    return {
+      aiSummary: String(description || '').trim() || 'Summary not available.',
+      aiSummaryCategory: category || 'General',
+      aiSummaryTags: [],
+      mood: mood.mood,
+      moodScore: mood.moodScore
+    };
+  }
+
   const prompt = `You are an enterprise HR analyst. Summarize all employee questionnaire responses into a concise factual summary, choose the most appropriate category, identify the employee's expressed mood without diagnosing them, and suggest up to 5 short tags. Return valid JSON only with {"summary":"brief summary","summaryCategory":"category","summaryTags":["tag1","tag2","tag3"],"mood":"short descriptive mood","moodScore":-1}. moodScore must be between -1 and 1.\n\nEmployee draft title: ${title || 'No title'}\nCategory: ${category || 'General'}\nPriority: ${priority || 'Medium'}\nDepartment: ${department || 'Not specified'}\nDescription: ${description || 'No description provided'}\n\nQuestionnaire answers:\n${answerText}`;
   try {
     const responseText = await aiCreate(prompt, { temperature: 0.5, maxTokens: 260 });

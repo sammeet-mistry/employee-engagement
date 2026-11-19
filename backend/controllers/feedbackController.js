@@ -10,6 +10,34 @@ const {
 } = require("../services/aiService");
 const { validationResult } = require("express-validator");
 const { categorizeMessage } = require('../services/scenarioService');
+const { emitFeedbackEvent, userRoom } = require('../utils/realtime');
+const { buildFeedbackQuery, createFeedbackCsv } = require('../utils/feedbackCsv');
+const { redactAnonymousSubmitter } = require('../utils/feedbackPrivacy');
+const { parsePagination, createPagination } = require('../utils/pagination');
+const { recordAudit } = require('../utils/audit');
+const User = require('../models/User');
+
+const getFeedbackSlaHours = () => {
+  const slaHours = Number(process.env.FEEDBACK_SLA_HOURS || 72);
+  if (!Number.isFinite(slaHours) || slaHours <= 0 || slaHours > 720) {
+    throw new Error('FEEDBACK_SLA_HOURS must be greater than 0 and no more than 720.');
+  }
+  return slaHours;
+};
+
+const getResponseDueAt = () => new Date(Date.now() + getFeedbackSlaHours() * 60 * 60 * 1000);
+
+const addResponseDeadline = (record) => {
+  const feedback = typeof record.toObject === 'function' ? record.toObject() : record;
+  if (feedback.responseDueAt || !feedback.createdAt) return feedback;
+
+  return {
+    ...feedback,
+    responseDueAt: new Date(
+      new Date(feedback.createdAt).getTime() + getFeedbackSlaHours() * 60 * 60 * 1000
+    )
+  };
+};
 
 exports.submitFeedback = async (req, res) => {
   const errors = validationResult(req);
@@ -47,6 +75,7 @@ exports.submitFeedback = async (req, res) => {
       questionCount: Object.keys(questionAnswers || {}).length,
       mood: aiSummaryResult.mood,
       moodScore: aiSummaryResult.moodScore,
+      responseDueAt: getResponseDueAt(),
       submittedBy: req.user.id
     });
 
@@ -83,9 +112,9 @@ exports.submitFeedback = async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.emit('feedback:created', { feedbackId: feedback._id });
+      emitFeedbackEvent(io, 'feedback:created', feedback);
       if (scenarioResult.unmatched) {
-        io.emit('scenario:unmatched', { unmatchedId: scenarioResult.unmatched._id });
+        io.to('admins').emit('scenario:unmatched', { unmatchedId: scenarioResult.unmatched._id });
       }
     }
 
@@ -98,10 +127,15 @@ exports.submitFeedback = async (req, res) => {
 
 exports.getMyFeedback = async (req, res) => {
   try {
-    const feedback = await Feedback.find({ submittedBy: req.user.id })
-      .sort({ createdAt: -1 });
-    res.json(feedback);
+    const { page, limit, skip } = parsePagination(req.query, 20);
+    const query = { submittedBy: req.user.id };
+    const [feedback, total] = await Promise.all([
+      Feedback.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Feedback.countDocuments(query)
+    ]);
+    res.json({ items: feedback, pagination: createPagination(page, limit, total) });
   } catch (err) {
+    console.error('Unable to load employee feedback:', err.code || err.name);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -131,7 +165,7 @@ exports.addFeedbackMessage = async (req, res) => {
     await feedback.save();
 
     const io = req.app.get('io');
-    if (io) io.emit('feedback:updated', { feedbackId: feedback._id });
+    if (io) emitFeedbackEvent(io, 'feedback:updated', feedback);
 
     res.status(201).json({ messages: feedback.messages });
   } catch (error) {
@@ -166,8 +200,32 @@ exports.refineAIFeedback = async (req, res) => {
 
 exports.getFeedbackWithReplies = async (req, res) => {
   try {
-    const feedback = await Feedback.find({ submittedBy: req.user.id })
-      .sort({ createdAt: -1 });
+    const { page, limit, skip } = parsePagination(req.query, 10);
+    const query = { submittedBy: req.user.id };
+    const searchQuery = buildFeedbackQuery({ search: req.query.search });
+    if (searchQuery.$or) query.$or = searchQuery.$or;
+
+    const statuses = {
+      Pending: ['Pending', 'AI Draft Generated'],
+      'In review': ['Under Review'],
+      Responded: ['Responded', 'Resolved', 'AI Auto Responded']
+    };
+    if (statuses[req.query.status]) query.status = { $in: statuses[req.query.status] };
+
+    const [feedback, total, statusCounts, latest] = await Promise.all([
+      Feedback.find(query)
+        .sort({ createdAt: req.query.sortOrder === 'oldest' ? 1 : -1 })
+        .skip(skip)
+        .limit(limit),
+      Feedback.countDocuments(query),
+      Feedback.aggregate([
+        { $match: { submittedBy: new mongoose.Types.ObjectId(req.user.id) } },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
+      ]),
+      Feedback.findOne({ submittedBy: req.user.id })
+        .select('title status createdAt')
+        .sort({ createdAt: -1 })
+    ]);
 
     const feedbackWithReplies = await Promise.all(
       feedback.map(async (fb) => {
@@ -183,7 +241,23 @@ exports.getFeedbackWithReplies = async (req, res) => {
       })
     );
 
-    res.json(feedbackWithReplies);
+    const allStatusCounts = statusCounts.reduce((counts, item) => {
+      counts[item._id] = item.count;
+      return counts;
+    }, {});
+    const summary = {
+      total: Object.values(allStatusCounts).reduce((sum, count) => sum + count, 0),
+      inReview: ['Pending', 'AI Draft Generated', 'Under Review']
+        .reduce((sum, status) => sum + (allStatusCounts[status] || 0), 0),
+      responded: ['Responded', 'Resolved', 'AI Auto Responded']
+        .reduce((sum, status) => sum + (allStatusCounts[status] || 0), 0),
+      latest
+    };
+
+    res.json({
+      items: feedbackWithReplies,
+      pagination: { ...createPagination(page, limit, total), summary }
+    });
   } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
@@ -191,51 +265,159 @@ exports.getFeedbackWithReplies = async (req, res) => {
 
 exports.getAllFeedback = async (req, res) => {
   try {
-    const { category, priority, status, department, anonymous, search, sortBy = "createdAt", sortOrder = "desc" } = req.query;
+    const { category, priority, status, department, anonymous, assignedTo, search, sortBy = "createdAt", sortOrder = "desc" } = req.query;
+    const { page, limit, skip } = parsePagination(req.query, 25);
+    const query = buildFeedbackQuery({ category, priority, status, department, anonymous, assignedTo, search });
+    const sortableFields = ['createdAt', 'updatedAt', 'priority', 'status'];
+    const sortOptions = {
+      [sortableFields.includes(sortBy) ? sortBy : 'createdAt']: sortOrder === "asc" ? 1 : -1
+    };
 
-    let query = {};
+    const [feedback, total] = await Promise.all([
+      Feedback.find(query)
+        .populate("submittedBy", "name email department")
+        .populate('assignedTo', 'name')
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(limit),
+      Feedback.countDocuments(query)
+    ]);
 
-    if (category) query.category = category;
-    if (priority) query.priority = priority;
-    if (status) query.status = status;
-    if (department) query.department = department;
-    if (anonymous !== undefined) query.anonymous = anonymous === "true";
-    if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } }
-      ];
-    }
+    const feedbackWithDeadlines = feedback.map(addResponseDeadline);
 
-    const sortOptions = {};
-    sortOptions[sortBy] = sortOrder === "desc" ? -1 : 1;
-
-    const feedback = await Feedback.find(query)
-      .populate("submittedBy", "name email department")
-      .sort(sortOptions);
-
-    res.json(feedback);
+    res.json({
+      items: redactAnonymousSubmitter(feedbackWithDeadlines),
+      pagination: createPagination(page, limit, total)
+    });
   } catch (err) {
+    console.error('Unable to load admin feedback:', err.code || err.name);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.exportFeedbackCsv = async (req, res) => {
+  try {
+    const feedback = await Feedback.find(buildFeedbackQuery(req.query))
+      .populate('submittedBy', 'name email')
+      .populate('assignedTo', 'name')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const csv = createFeedbackCsv(feedback.map(addResponseDeadline));
+    const date = new Date().toISOString().slice(0, 10);
+    await recordAudit(req, {
+      action: 'feedback.csv_exported',
+      resourceType: 'feedback',
+      details: {
+        rowCount: feedback.length,
+        filters: {
+          category: req.query.category || '',
+          priority: req.query.priority || '',
+          status: req.query.status || '',
+          department: req.query.department || '',
+          anonymous: req.query.anonymous || '',
+          assignedTo: req.query.assignedTo || '',
+          searchApplied: Boolean(req.query.search)
+        }
+      }
+    });
+
+    res
+      .status(200)
+      .set({
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="feedback-export-${date}.csv"`,
+        'Cache-Control': 'no-store'
+      })
+      .send(`\uFEFF${csv}`);
+  } catch (err) {
+    console.error('Unable to export feedback CSV:', err);
+    res.status(500).json({ message: 'Unable to export feedback right now.' });
   }
 };
 
 exports.updateFeedbackStatus = async (req, res) => {
   const { id } = req.params;
-  const { status } = req.body;
+  const status = req.body?.status;
+  if (!Feedback.schema.path('status').enumValues.includes(status)) {
+    return res.status(400).json({ message: 'Choose a valid feedback status.' });
+  }
 
   try {
     const feedback = await Feedback.findByIdAndUpdate(
       id,
       { status },
-      { new: true }
+      { new: true, runValidators: true }
     );
     if (!feedback) {
       return res.status(404).json({ message: "Feedback not found" });
     }
+    await recordAudit(req, {
+      action: 'feedback.status_updated',
+      resourceType: 'feedback',
+      resourceId: feedback._id,
+      details: { status }
+    });
+    const io = req.app.get('io');
+    if (io) emitFeedbackEvent(io, 'feedback:updated', feedback);
     res.json(feedback);
   } catch (err) {
+    console.error('Unable to update feedback status:', err.code || err.name);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.updateFeedbackAssignment = async (req, res) => {
+  const { id } = req.params;
+  if (!req.body || !Object.prototype.hasOwnProperty.call(req.body, 'assignedTo')) {
+    return res.status(400).json({ message: 'Choose an HR administrator or select unassigned.' });
+  }
+  if (req.body.assignedTo !== null && typeof req.body.assignedTo !== 'string') {
+    return res.status(400).json({ message: 'Choose a valid HR administrator.' });
+  }
+  const assigneeId = typeof req.body.assignedTo === 'string' && req.body.assignedTo.trim()
+    ? req.body.assignedTo.trim()
+    : null;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(404).json({ message: 'Feedback not found.' });
+  }
+  if (assigneeId && !mongoose.Types.ObjectId.isValid(assigneeId)) {
+    return res.status(400).json({ message: 'Choose a valid HR administrator.' });
+  }
+
+  try {
+    if (assigneeId) {
+      const assignee = await User.findOne({ _id: assigneeId, role: 'admin' }).select('_id');
+      if (!assignee) return res.status(400).json({ message: 'Choose a valid HR administrator.' });
+    }
+
+    const feedback = await Feedback.findById(id);
+    if (!feedback) return res.status(404).json({ message: 'Feedback not found.' });
+    feedback.assignedTo = assigneeId;
+    await feedback.save();
+    await recordAudit(req, {
+      action: 'feedback.assignment_updated',
+      resourceType: 'feedback',
+      resourceId: feedback._id,
+      details: { assignedTo: assigneeId }
+    });
+
+    const populatedFeedback = await Feedback.findById(feedback._id)
+      .populate('submittedBy', 'name email department')
+      .populate('assignedTo', 'name');
+    const io = req.app.get('io');
+    if (io) {
+      emitFeedbackEvent(io, 'feedback:updated', populatedFeedback);
+      if (assigneeId) {
+        io.to(userRoom(assigneeId)).emit('feedback:assignment', { feedbackId: feedback._id });
+      }
+    }
+
+    res.json(redactAnonymousSubmitter([populatedFeedback])[0]);
+  } catch (error) {
+    console.error('Unable to update feedback assignment or audit history:', error.code || error.name);
+    res.status(500).json({ message: 'Unable to update this feedback assignment right now.' });
   }
 };
 
@@ -243,8 +425,15 @@ exports.deleteFeedback = async (req, res) => {
   const { id } = req.params;
 
   try {
-    await Feedback.findByIdAndDelete(id);
+    const feedback = await Feedback.findByIdAndDelete(id);
+    if (!feedback) return res.status(404).json({ message: 'Feedback not found' });
     await Reply.deleteMany({ feedbackId: id });
+    await recordAudit(req, {
+      action: 'feedback.deleted',
+      resourceType: 'feedback',
+      resourceId: id,
+      details: { anonymous: feedback.anonymous, category: feedback.category }
+    });
     res.json({ message: "Feedback deleted" });
   } catch (err) {
     res.status(500).json({ message: "Server error" });

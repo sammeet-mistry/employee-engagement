@@ -3,6 +3,7 @@ import { FiArrowUpRight, FiCheck, FiChevronRight, FiPlus, FiRefreshCw, FiSend, F
 import axios from '../utils/axios';
 import { formatFullDateTime } from '../utils/date';
 import socket from '../utils/socket';
+import Pagination from './Pagination';
 
 const getSessionLabel = (status) => {
   if (status === 'sent_to_hr') return 'Sent to HR';
@@ -32,21 +33,30 @@ const HRKnowledgeAssistant = () => {
   const [retryAction, setRetryAction] = useState('sessions');
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [sessionsPage, setSessionsPage] = useState(1);
+  const [sessionsPagination, setSessionsPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
   const [confirmAction, setConfirmAction] = useState(null);
   const activeSessionRef = useRef(activeSession);
   const messageEndRef = useRef(null);
   const confirmDialogRef = useRef(null);
   activeSessionRef.current = activeSession;
 
-  const loadSessions = useCallback(async () => {
+  const loadSessions = useCallback(async (page = sessionsPage) => {
     setLoadingSessions(true);
     setErrorMessage('');
     try {
-      const { data } = await axios.get('/api/chat/sessions/my');
-      setSessions(data);
+      const { data } = await axios.get('/api/chat/sessions/my', {
+        params: { page, limit: 10 }
+      });
+      setSessions(data.items);
+      setSessionsPagination(data.pagination);
       setRetryAction(null);
-      if (!activeSessionRef.current && data.length) {
-        setActiveSession(data[0]);
+      if (!activeSessionRef.current && data.items.length) {
+        setActiveSession(data.items[0]);
+      }
+      const lastPage = Math.max(1, data.pagination.totalPages);
+      if (page > lastPage) {
+        setSessionsPage(lastPage);
       }
     } catch (error) {
       setRetryAction('sessions');
@@ -54,7 +64,7 @@ const HRKnowledgeAssistant = () => {
     } finally {
       setLoadingSessions(false);
     }
-  }, []);
+  }, [sessionsPage]);
 
   useEffect(() => {
     loadSessions();
@@ -66,8 +76,11 @@ const HRKnowledgeAssistant = () => {
           setActiveSession(data);
           setSessions((previous) => previous.map((session) => session._id === data._id ? data : session));
         } else {
-          const { data } = await axios.get('/api/chat/sessions/my');
-          setSessions(data);
+          const { data } = await axios.get('/api/chat/sessions/my', {
+            params: { page: sessionsPage, limit: 10 }
+          });
+          setSessions(data.items);
+          setSessionsPagination(data.pagination);
         }
       } catch (error) {
         setRetryAction('sessions');
@@ -88,7 +101,7 @@ const HRKnowledgeAssistant = () => {
       socket.off('chat:session-updated', refreshSession);
       socket.off('chat:session-deleted', handleSessionDeleted);
     };
-  }, [loadSessions]);
+  }, [loadSessions, sessionsPage]);
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -132,6 +145,8 @@ const HRKnowledgeAssistant = () => {
     try {
       const { data } = await axios.post('/api/chat/session', { title: 'HR Knowledge Assistant' });
       updateSession(data);
+      setSessionsPage(1);
+      await loadSessions(1);
       setRetryAction(null);
       setStatusMessage('Conversation created. Your question will only be sent when you choose to send it.');
     } catch (error) {
@@ -240,27 +255,37 @@ const HRKnowledgeAssistant = () => {
           {loadingSessions ? (
             <div className="rag-sidebar-state" role="status">Loading conversations…</div>
           ) : sessions.length ? (
-            <div className="rag-session-list">
-              {sessions.map((session) => (
-                <button
-                  type="button"
-                  key={session._id}
-                  className={`rag-session-item ${activeSession?._id === session._id ? 'is-selected' : ''}`}
-                  onClick={() => selectSession(session)}
-                  aria-current={activeSession?._id === session._id ? 'true' : undefined}
-                >
-                  <span className="rag-session-item-top">
-                    <strong>{getSessionTitle(session)}</strong>
-                    <FiChevronRight aria-hidden="true" />
-                  </span>
-                  <span className="rag-session-preview">{session.messages?.find((entry) => entry.sender === 'employee')?.text || 'New conversation'}</span>
-                  <span className="rag-session-meta">
-                    <span className={`rag-session-state state-${session.status}`}>{getSessionLabel(session.status)}</span>
-                    <time dateTime={session.updatedAt}>{formatFullDateTime(session.updatedAt)}</time>
-                  </span>
-                </button>
-              ))}
-            </div>
+            <>
+              <div className="rag-session-list">
+                {sessions.map((session) => (
+                  <button
+                    type="button"
+                    key={session._id}
+                    className={`rag-session-item ${activeSession?._id === session._id ? 'is-selected' : ''}`}
+                    onClick={() => selectSession(session)}
+                    aria-current={activeSession?._id === session._id ? 'true' : undefined}
+                  >
+                    <span className="rag-session-item-top">
+                      <strong>{getSessionTitle(session)}</strong>
+                      <FiChevronRight aria-hidden="true" />
+                    </span>
+                    <span className="rag-session-preview">{session.messages?.[session.messages.length - 1]?.text || 'New conversation'}</span>
+                    <span className="rag-session-meta">
+                      <span className={`rag-session-state state-${session.status}`}>{getSessionLabel(session.status)}</span>
+                      <time dateTime={session.updatedAt}>{formatFullDateTime(session.updatedAt)}</time>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <Pagination
+                page={sessionsPagination.page}
+                totalPages={sessionsPagination.totalPages}
+                total={sessionsPagination.total}
+                limit={sessionsPagination.limit}
+                onPageChange={setSessionsPage}
+                label="conversations"
+              />
+            </>
           ) : (
             <div className="rag-sidebar-empty">
               <span>No conversations yet.</span>

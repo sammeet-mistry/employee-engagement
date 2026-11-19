@@ -30,9 +30,9 @@ export const fetchMyFeedback = createAsyncThunk(
 
 export const fetchMyFeedbackWithReplies = createAsyncThunk(
   'feedback/fetchMyWithReplies',
-  async (_, { rejectWithValue }) => {
+  async (params = {}, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`${API_URL}/my-with-replies`);
+      const response = await axios.get(`${API_URL}/my-with-replies`, { params });
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message || 'Unable to load your feedback.');
@@ -48,7 +48,7 @@ export const fetchAllFeedback = createAsyncThunk(
       const response = await axios.get(`${API_URL}?${queryString}`);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response.data.message);
+      return rejectWithValue(error.response?.data?.message || error.message || 'Unable to load feedback.');
     }
   }
 );
@@ -61,6 +61,18 @@ export const updateFeedbackStatus = createAsyncThunk(
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response.data.message);
+    }
+  }
+);
+
+export const updateFeedbackAssignment = createAsyncThunk(
+  'feedback/updateAssignment',
+  async ({ id, assignedTo }, { rejectWithValue }) => {
+    try {
+      const response = await axios.patch(`${API_URL}/${id}/assignment`, { assignedTo });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message || 'Unable to update feedback assignment.');
     }
   }
 );
@@ -117,11 +129,15 @@ const feedbackSlice = createSlice({
   name: 'feedback',
   initialState: {
     myFeedback: [],
+    myFeedbackPagination: { page: 1, limit: 10, total: 0, totalPages: 0, summary: { total: 0, inReview: 0, responded: 0 } },
     allFeedback: [],
+    allFeedbackPagination: { page: 1, limit: 25, total: 0, totalPages: 0 },
     stats: {},
     loading: false,
     error: null,
     fetchError: null,
+    myFeedbackRequestId: null,
+    allFeedbackRequestId: null,
   },
   reducers: {
     clearError: (state) => {
@@ -142,50 +158,80 @@ const feedbackSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      .addCase(fetchMyFeedback.pending, (state) => {
+      .addCase(fetchMyFeedback.pending, (state, action) => {
         state.loading = true;
         state.error = null;
         state.fetchError = null;
+        state.myFeedbackRequestId = action.meta.requestId;
       })
       .addCase(fetchMyFeedback.fulfilled, (state, action) => {
-        state.loading = false;
-        state.error = null;
-        state.fetchError = null;
-        state.myFeedback = action.payload;
+        if (state.myFeedbackRequestId === action.meta.requestId) {
+          state.loading = false;
+          state.error = null;
+          state.fetchError = null;
+          state.myFeedback = action.payload.items;
+          state.myFeedbackPagination = action.payload.pagination;
+          state.myFeedbackRequestId = null;
+        }
       })
       .addCase(fetchMyFeedback.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-        state.fetchError = action.payload;
+        if (state.myFeedbackRequestId === action.meta.requestId) {
+          state.loading = false;
+          state.error = action.payload;
+          state.fetchError = action.payload;
+          state.myFeedbackRequestId = null;
+        }
       })
-      .addCase(fetchMyFeedbackWithReplies.pending, (state) => {
+      .addCase(fetchMyFeedbackWithReplies.pending, (state, action) => {
         state.loading = true;
         state.error = null;
         state.fetchError = null;
+        state.myFeedbackRequestId = action.meta.requestId;
       })
       .addCase(fetchMyFeedbackWithReplies.fulfilled, (state, action) => {
-        state.loading = false;
-        state.error = null;
-        state.fetchError = null;
-        state.myFeedback = action.payload;
+        if (state.myFeedbackRequestId === action.meta.requestId) {
+          state.loading = false;
+          state.error = null;
+          state.fetchError = null;
+          state.myFeedback = action.payload.items;
+          state.myFeedbackPagination = action.payload.pagination;
+          state.myFeedbackRequestId = null;
+        }
       })
       .addCase(fetchMyFeedbackWithReplies.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-        state.fetchError = action.payload;
+        if (state.myFeedbackRequestId === action.meta.requestId) {
+          state.loading = false;
+          state.error = action.payload;
+          state.fetchError = action.payload;
+          state.myFeedbackRequestId = null;
+        }
       })
-      .addCase(fetchAllFeedback.pending, (state) => {
+      .addCase(fetchAllFeedback.pending, (state, action) => {
         state.loading = true;
+        state.allFeedbackRequestId = action.meta.requestId;
       })
       .addCase(fetchAllFeedback.fulfilled, (state, action) => {
-        state.loading = false;
-        state.allFeedback = action.payload;
+        if (state.allFeedbackRequestId === action.meta.requestId) {
+          state.loading = false;
+          state.allFeedback = action.payload.items;
+          state.allFeedbackPagination = action.payload.pagination;
+          state.allFeedbackRequestId = null;
+        }
       })
       .addCase(fetchAllFeedback.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
+        if (state.allFeedbackRequestId === action.meta.requestId) {
+          state.loading = false;
+          state.error = action.payload;
+          state.allFeedbackRequestId = null;
+        }
       })
       .addCase(updateFeedbackStatus.fulfilled, (state, action) => {
+        const index = state.allFeedback.findIndex(fb => fb._id === action.payload._id);
+        if (index !== -1) {
+          state.allFeedback[index] = action.payload;
+        }
+      })
+      .addCase(updateFeedbackAssignment.fulfilled, (state, action) => {
         const index = state.allFeedback.findIndex(fb => fb._id === action.payload._id);
         if (index !== -1) {
           state.allFeedback[index] = action.payload;

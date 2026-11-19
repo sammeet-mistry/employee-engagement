@@ -3,7 +3,10 @@ const {
   generateAIReply,
   approveAndSendReply,
   getRepliesForFeedback,
-  getFeedbackStats
+  getFeedbackStats,
+  getAuditLogs,
+  getAssignableAdmins,
+  getAssignedFeedbackCount
 } = require('../controllers/adminController');
 const { auth, adminOnly } = require('../middleware/auth');
 const {
@@ -20,6 +23,9 @@ router.post('/generate-ai-reply/:feedbackId', auth, adminOnly, generateAIReply);
 router.post('/approve-reply/:replyId', auth, adminOnly, approveAndSendReply);
 router.get('/replies/:feedbackId', auth, adminOnly, getRepliesForFeedback);
 router.get('/stats', auth, adminOnly, getFeedbackStats);
+router.get('/audit', auth, adminOnly, getAuditLogs);
+router.get('/assignees', auth, adminOnly, getAssignableAdmins);
+router.get('/assigned-feedback-count', auth, adminOnly, getAssignedFeedbackCount);
 router.get('/scenarios', auth, adminOnly, getScenarios);
 router.patch('/scenarios/:id', auth, adminOnly, updateScenario);
 router.delete('/scenarios/:id', auth, adminOnly, deleteScenario);

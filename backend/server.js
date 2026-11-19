@@ -4,10 +4,14 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const session = require('express-session');
+const { MongoStore } = require('connect-mongo');
+const jwt = require('jsonwebtoken');
 const path = require('path');
 const mongoSanitize = require('express-mongo-sanitize');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 const { connectDB } = require('./utils/db');
+const { createCsrfProtection } = require('./middleware/csrf');
 
 const defaultFrontendOrigins = [
   'http://localhost:5173',
@@ -30,12 +34,42 @@ const frontendOrigins = process.env.FRONTEND_URL
   : defaultFrontendOrigins;
 
 const app = express();
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret) {
+  throw new Error('SESSION_SECRET is required to start the server.');
+}
+
+app.set('trust proxy', 1);
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
   cors: { origin: frontendOrigins, credentials: true }
 });
 app.set('io', io);
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (typeof token !== 'string' || !process.env.SOCKET_TOKEN_SECRET) {
+    return next(new Error('Socket authentication required.'));
+  }
+
+  try {
+    const user = jwt.verify(token, process.env.SOCKET_TOKEN_SECRET, {
+      algorithms: ['HS256'],
+      issuer: 'employee-engagement'
+    });
+    if (user.purpose !== 'socket' || !user.sub || !['admin', 'employee'].includes(user.role)) {
+      return next(new Error('Socket authentication failed.'));
+    }
+
+    socket.data.user = { id: user.sub, role: user.role };
+    return next();
+  } catch {
+    return next(new Error('Socket authentication failed.'));
+  }
+});
+
 io.on('connection', (socket) => {
+  socket.join(`user:${socket.data.user.id}`);
+  if (socket.data.user.role === 'admin') socket.join('admins');
   console.log(`Realtime client connected: ${socket.id}`);
   socket.on('disconnect', () => console.log(`Realtime client disconnected: ${socket.id}`));
 });
@@ -50,6 +84,25 @@ app.use(cors({
   credentials: true
 }));
 app.use(mongoSanitize());
+app.use(session({
+  name: 'employee.sid',
+  secret: sessionSecret,
+  store: MongoStore.create({
+    mongoUrl: process.env.MONGODB_URI,
+    collectionName: 'sessions',
+    ttl: 7 * 24 * 60 * 60
+  }),
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000
+  }
+}));
+
+app.use(createCsrfProtection(frontendOrigins));
 
 // Rate limiting
 const limiter = rateLimit({

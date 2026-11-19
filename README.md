@@ -13,15 +13,18 @@ A full-stack employee engagement platform for feedback submissions, HR follow-up
 - **Scenario Matching**: MongoDB-backed scenario matching and admin review queue remain separate from document retrieval
 - **HR Knowledge Assistant**: Chat contract boundary for the approved RAG agent, with source references, no-source handling, and HR escalation support
 - **Feedback Management**: AI-enhanced feedback forms, employee and HR message threads, question generation, refinement suggestions, and categorization
-- **Role-based Access**: Secure authentication with JWT for employees and admins with granular permission control
+- **Role-based Access**: MongoDB-backed server-side sessions with HTTP-only cookies, CSRF protection, and employee/admin permissions
 - **Employee Activity Summary**: Counts are derived from the signed-in employee's stored feedback; no unsupported analytics are displayed
 - **Professional UI**: Enterprise-grade design with Tailwind CSS and fully responsive components
 
 ### Advanced Features (Jul 17 - Aug 30)
 - **Batch Operations**: Bulk feedback approval, status updates, and reply management from admin dashboard
 - **Advanced Filtering & Search**: Multi-field filtering, date range queries, sentiment analysis, and department-based segmentation
-- **Export Functionality**: Export feedback reports as CSV/PDF with customizable date ranges and filters
-- **Activity Logging**: Comprehensive audit trail of user actions, feedback modifications, and admin operations
+- **Feedback CSV Export**: Admins can download all feedback on demand, use the active feedback filters, and preserve submitter privacy for anonymous entries
+- **Paginated History**: Feedback lists and employee/admin chat-session lists load in bounded pages
+- **Anonymous Feedback Privacy**: Admin API responses and exports omit submitter identity for anonymous entries
+- **Admin Audit History**: Records feedback CSV exports, assignment/status changes, and reply actions for admin review
+- **HR Assignment & SLA**: Assign feedback to an HR admin, track a configurable response deadline, and surface overdue items
 - **Notification System**: Email notifications for feedback responses, escalations, and admin alerts
 - **Performance Analytics**: Response time tracking, user engagement scoring, and effectiveness metrics
 - **Data Validation**: Enhanced input validation, sanitization, and schema enforcement at both frontend and backend
@@ -33,10 +36,10 @@ A full-stack employee engagement platform for feedback submissions, HR follow-up
 
 - **Frontend**: React.js + Vite, Tailwind CSS, Redux Toolkit, Axios for HTTP client
 - **Backend**: Node.js + Express.js, MongoDB + Mongoose, Socket.IO for real-time communication
-- **Authentication**: JWT with bcrypt for secure password hashing
+- **Authentication**: MongoDB-backed sessions, secure cookies, CSRF validation, and bcrypt password hashing
 - **Feedback AI Services**: OpenAI API or Google Gemini API for the existing feedback/questionnaire and admin workflows
 - **Caching & Jobs**: Redis for caching and Bull for job queue management (added Aug 15)
-- **Testing**: Jest for unit testing, Supertest for API testing, React Testing Library for components (added Aug 5)
+- **Testing**: Node's built-in test runner for backend utilities and middleware
 - **Security**: Helmet, CORS, Rate Limiting, Input Validation, SQL injection prevention
 - **Monitoring**: Winston logging, performance metrics, error tracking
 
@@ -44,7 +47,7 @@ A full-stack employee engagement platform for feedback submissions, HR follow-up
 
 ### Prerequisites
 
-- Node.js (v16 or higher)
+- Node.js (v18 or higher)
 - MongoDB (local or cloud instance)
 - An OpenAI or Google Gemini API key for existing feedback/questionnaire and admin AI workflows (optional for the separately configured HR knowledge assistant)
 
@@ -63,8 +66,9 @@ A full-stack employee engagement platform for feedback submissions, HR follow-up
 3. Create a `.env` file in the backend directory:
    ```env
    MONGODB_URI=mongodb://localhost:27017/employee-engagement
-   JWT_SECRET=your-super-secret-jwt-key-here
-   JWT_EXPIRE=7d
+   SESSION_SECRET=generate-a-long-random-secret
+   SOCKET_TOKEN_SECRET=replace-with-another-long-random-secret
+   FEEDBACK_SLA_HOURS=72
    FRONTEND_URL=http://localhost:5173
    # These provider settings are for feedback/questionnaire and admin AI only.
    # Employee chat does not call either provider.
@@ -81,6 +85,7 @@ A full-stack employee engagement platform for feedback submissions, HR follow-up
    EMAIL_USER=your-email@gmail.com
    EMAIL_PASSWORD=your-app-password
    ```
+   Replace `SESSION_SECRET` with a randomly generated value; do not use the example text in a real deployment.
 
    To use OpenAI for the existing feedback-related AI workflows instead, set `AI_PROVIDER=openai` and `OPENAI_API_KEY`. These settings do not connect the RAG agent.
 
@@ -108,8 +113,7 @@ A full-stack employee engagement platform for feedback submissions, HR follow-up
 
 8. (Optional) Run tests:
    ```bash
-   npm test                 # Run all tests
-   npm run test:coverage   # Generate coverage report
+   npm test
    ```
 
 ### Frontend Setup
@@ -130,18 +134,12 @@ A full-stack employee engagement platform for feedback submissions, HR follow-up
    ```
    Frontend will be available at `http://localhost:5173`
 
-4. (Optional) Run tests:
-   ```bash
-   npm test                 # Run all tests
-   npm run test:coverage   # Generate coverage report
-   ```
-
-5. (Optional) Build for production:
+4. (Optional) Build for production:
    ```bash
    npm run build
    ```
 
-The frontend expects the backend at `http://localhost:5002`.
+In development, Vite proxies `/api` requests to `http://localhost:5002`.
 
 ### Sign-in examples
 
@@ -168,7 +166,7 @@ Employees can self-register through the frontend signup page. New users are assi
 
 ## Deploying with Render and Vercel
 
-The recommended arrangement is the Express API on Render and the Vite single-page application on Vercel. MongoDB must be reachable from Render. The repository includes a Render Blueprint in `render.yaml` and SPA route rewrites in `frontend/vercel.json`.
+The recommended arrangement is the Express API on Render and the Vite single-page application on Vercel. MongoDB must be reachable from Render. Vercel rewrites `/api/*` to Render so the browser uses the Vercel origin for API and session cookies. The repository includes a Render Blueprint in `render.yaml` and routes in `frontend/vercel.json`.
 
 ### 1. Prepare MongoDB Atlas
 
@@ -181,7 +179,7 @@ The recommended arrangement is the Express API on Render and the Vite single-pag
 1. Push the repository to GitHub. Do not commit `.env` files.
 2. In Render, choose **New +**, then **Blueprint**, and connect this repository. Render reads `render.yaml`. The service root is `backend`, the build command is `npm ci`, the start command is `npm start`, and its health check is `/api/health`.
 3. Supply the `MONGODB_URI` connection string and `FRONTEND_URL`. You can initially use the Vercel production origin after creating the frontend deployment. Origins are exact and can be comma-separated, for example `https://your-project.vercel.app,https://www.your-domain.example`.
-4. Render generates `JWT_SECRET`. Keep it private and do not rotate it casually, since rotation signs out existing sessions.
+4. Render generates `SESSION_SECRET`. Keep it private; rotating it invalidates existing sessions.
 5. Wait for the Render service to report healthy, then verify `https://YOUR-RENDER-SERVICE.onrender.com/api/health` returns JSON with `"status":"OK"`.
 6. Create the first administrator only after deployment, using a unique password of at least 12 characters. In Render's service Shell, from the backend service root, run `ADMIN_NAME='XYZ HR Administrator' ADMIN_EMAIL='hr-admin@your-domain.example' ADMIN_PASSWORD='<your-unique-secret>' npm run seed`, replacing the example name, email, and password with your own values. Do not use the literal example values. The command does not print the password and refuses to overwrite an existing account. Avoid saving the temporary password as a permanent service environment variable. Do not use any old local demo admin credentials.
 
@@ -190,13 +188,14 @@ The recommended arrangement is the Express API on Render and the Vite single-pag
 1. In Vercel, import the same GitHub repository as a separate project.
 2. Set **Root Directory** to `frontend`.
 3. Use the Vite defaults, or set build command to `npm run build` and output directory to `dist`.
-4. Add `VITE_API_URL=https://YOUR-RENDER-SERVICE.onrender.com` for Production and any Preview environments that should call the API. Do not add a trailing slash. This value is public configuration, not a secret.
-5. Deploy. The `frontend/vercel.json` rewrite supports direct navigation and refresh on routes such as `/login`, `/signup`, `/employee`, and `/admin`.
-6. Copy the exact Vercel production origin into Render's `FRONTEND_URL` setting, then redeploy the API. If Vercel preview deployments should also call the API, add their exact origins to the comma-separated allowlist. Redeploy after changing environment variables.
+4. Replace `YOUR-RENDER-SERVICE` in the `/api/:path*` destination in `frontend/vercel.json` with the Render service hostname. Also set `VITE_API_URL` to that Render origin for the Socket.IO connection.
+5. Deploy. The `frontend/vercel.json` routes support API calls and direct navigation to pages such as `/login`, `/signup`, `/employee`, and `/admin`.
+6. Copy the exact Vercel production origin into Render's `FRONTEND_URL` setting, then redeploy the API. If Vercel preview deployments should also call the API or Socket.IO, add their exact origins to the comma-separated allowlist. Redeploy after changing environment variables.
 
 ### 4. Production setup and smoke test
 
 - Employee accounts can register at `/signup`. Administrator accounts must be provisioned separately as described above.
+- The Vercel API rewrite proxies requests through the Vercel origin, which keeps session cookies first-party. The Render API itself also needs `SESSION_SECRET`, `SOCKET_TOKEN_SECRET`, and `FRONTEND_URL`.
 - Check the Render health endpoint, sign in as the provisioned administrator, register an employee, submit feedback, reply as HR, and confirm the employee can see the conversation.
 - Render free services may sleep when idle, which can make the first request slow. Socket.IO and the API are served by the same Render service.
 - Existing feedback/questionnaire AI also needs the appropriate server-side provider configuration if those features are required. Never put provider credentials in `VITE_*` variables.
@@ -219,7 +218,7 @@ Before enabling employee RAG in production, deploy the existing RAG service and 
 ## Project Timeline & Implementation (Jul 17 - Aug 30, 2026)
 
 ### Phase 1: Core System (Jul 17 - Jul 31)
-- ✅ User authentication system with JWT and role-based access
+- ✅ User authentication system with server-side sessions and role-based access
 - ✅ Feedback submission and management system
 - ✅ Feedback questionnaire and admin AI workflows
 - ⏳ Employee RAG assistant adapter (waiting for the existing agent contract)
@@ -252,11 +251,13 @@ Before enabling employee RAG in production, deploy the existing RAG service and 
 
 ### Authentication
 - `POST /api/auth/register` - Register new user with validation
-- `POST /api/auth/login` - Login and receive JWT token
+- `POST /api/auth/login` - Login and create a server-side session
+- `POST /api/auth/logout` - Destroy the current server-side session
+- `GET /api/auth/csrf` - Get a CSRF token for a state-changing request
 - `GET /api/auth/profile` - Get authenticated user profile (Protected)
 
 ### Employee HR Knowledge Assistant
-All chat routes require a valid JWT. Employee session queries and mutations are scoped to the authenticated employee; only admin routes can list all sessions or add an HR/admin message.
+All chat routes require an authenticated server-side session. Employee session queries and mutations are scoped to the authenticated employee; only admin routes can list all sessions or add an HR/admin message.
 
 - `POST /api/chat/session` - Create an empty HR knowledge assistant conversation
 - `GET /api/chat/sessions/my` - Retrieve the authenticated employee's sessions
@@ -310,6 +311,7 @@ The employee-engagement repository does not include the separate RAG-Agent check
 ### Feedback (Admin)
 - `GET /api/feedback` - Get all feedback with advanced filtering
 - `PATCH /api/feedback/:id/status` - Update feedback status (open/closed/resolved)
+- `PATCH /api/feedback/:id/assignment` - Assign feedback to an HR admin or mark it unassigned
 - `DELETE /api/feedback/:id` - Delete feedback record
 - `POST /api/feedback/bulk-action` - Perform bulk operations on multiple feedback
 
@@ -334,10 +336,15 @@ The employee-engagement repository does not include the separate RAG-Agent check
 
 ### Analytics & Reporting
 - `GET /api/admin/stats` - Get engagement statistics and metrics
+- `GET /api/admin/audit` - List paginated administrator audit events (admin only)
+- `GET /api/admin/assignees` - List HR admins available for assignment
+- `GET /api/admin/assigned-feedback-count` - Count the signed-in admin's open assignments
 - `GET /api/admin/stats/feedback-by-category` - Feedback breakdown by category
 - `GET /api/admin/stats/response-time` - Average response time metrics
 - `GET /api/admin/stats/department-wise` - Department-based analytics
-- `GET /api/admin/export/feedback?format=csv&dateRange=` - Export feedback data
+- `GET /api/feedback/export.csv` - Download feedback as CSV (admin only; accepts the same filters as `GET /api/feedback`, and omits submitter identity for anonymous feedback)
+
+Feedback and chat-session list endpoints accept `page` and `limit` query parameters and return `items` plus pagination metadata. The server caps page size at 100.
 
 ### Real-time Events (Socket.IO)
 - `chat:session-updated` - Chat session changed
@@ -348,7 +355,8 @@ The employee-engagement repository does not include the separate RAG-Agent check
 
 ## Security Features
 
-- **JWT Authentication**: Token-based authentication with configurable expiration
+- **Session Authentication**: MongoDB-backed sessions, HTTP-only cookies, and logout revocation
+- **CSRF Protection**: Session-bound tokens and frontend-origin validation for state-changing requests
 - **Password Security**: Bcrypt hashing with salt rounds
 - **Role-based Access Control**: Employee and Admin role separation
 - **Rate Limiting**: Protection against brute force and DDoS attacks on sensitive endpoints
@@ -365,7 +373,7 @@ The employee-engagement repository does not include the separate RAG-Agent check
 
 1. Never commit `.env` files to version control
 2. Regularly update dependencies for security patches
-3. Use strong JWT_SECRET in production
+3. Use a strong, private SESSION_SECRET in production
 4. Enable HTTPS in production deployments
 5. Implement proper error handling (don't leak stack traces)
 6. Use environment-specific configurations
@@ -471,7 +479,7 @@ npm run lint:fix      # Auto-fix style issues
 2. **Backend Configuration**:
    - Set all production environment variables
    - Configure production MongoDB connection string
-   - Set secure JWT_SECRET
+   - Set a strong, private SESSION_SECRET
    - Enable HTTPS and SSL certificates
 
 3. **Serve Static Files**:
@@ -577,7 +585,7 @@ Comprehensive testing has been implemented across all layers of the application 
   - LoadingSpinner: Visibility toggling, accessibility
 
 - **Redux Store Testing**:
-  - authSlice: Login/logout state, token management
+  - authSlice: Login/logout state and session status
   - feedbackSlice: Feedback list updates, filters, sorting
   - State persistence and rehydration
 
@@ -591,7 +599,7 @@ Comprehensive testing has been implemented across all layers of the application 
 #### API Integration Tests
 - **Authentication Endpoints**:
   - POST /api/auth/register - User registration with validation
-  - POST /api/auth/login - Login with JWT token generation
+  - POST /api/auth/login - Login with server-side session creation
   - GET /api/auth/profile - Protected route access verification
   - Token expiration and refresh scenarios
 
@@ -640,7 +648,7 @@ Comprehensive testing has been implemented across all layers of the application 
   5. Monitor analytics → Export reports
 
 - **Authentication Security**:
-  - JWT token validation across requests
+  - Session and CSRF validation across requests
   - Role-based access control enforcement
   - Session timeout and renewal
   - CORS and CSRF protection verification
@@ -678,7 +686,7 @@ Comprehensive testing has been implemented across all layers of the application 
   - Rate limiting on sensitive endpoints
 
 - **Authentication & Authorization**:
-  - JWT signature verification
+  - Session cookie validation and invalidation
   - Token tampering detection
   - Unauthorized access attempts
   - Role-based permission enforcement

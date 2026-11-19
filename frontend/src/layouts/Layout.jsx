@@ -7,11 +7,11 @@ import { FiLogOut, FiUsers } from 'react-icons/fi';
 const Layout = ({ children }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user } = useSelector((state) => state.auth);
+  const { user, error, loggingOut } = useSelector((state) => state.auth);
 
-  const handleLogout = () => {
-    dispatch(logout());
-    navigate('/');
+  const handleLogout = async () => {
+    const result = await dispatch(logout());
+    if (logout.fulfilled.match(result)) navigate('/');
   };
 
   return (
@@ -31,14 +31,20 @@ const Layout = ({ children }) => {
               <button
                 type="button"
                 onClick={handleLogout}
+                disabled={loggingOut}
                 className="employee-shell-logout"
               >
-                <FiLogOut aria-hidden="true" /> Sign out
+                <FiLogOut aria-hidden="true" /> {loggingOut ? 'Signing out…' : 'Sign out'}
               </button>
             </div>
           </div>
         </div>
       </nav>
+      {error && (
+        <p className="mx-auto mt-3 w-full max-w-7xl px-4 text-sm text-red-700 sm:px-6 lg:px-8" role="alert">
+          {error}
+        </p>
+      )}
       <main className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
         {children}
       </main>
