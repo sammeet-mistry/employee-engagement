@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://employee-engagement.onrender.com"
+      "destination": "https://employee-engagement.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",
