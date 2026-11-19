@@ -1,8 +1,11 @@
 import { io } from 'socket.io-client';
 import axios from './axios';
 
-const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5002', {
+const socketUrl = import.meta.env.VITE_API_URL
+  || (import.meta.env.DEV ? 'http://localhost:5002' : window.location.origin);
+const socket = io(socketUrl, {
   autoConnect: false,
+  path: '/api/socket.io',
   transports: ['websocket'],
   auth: (callback) => {
     axios.get('/api/auth/socket-token')

@@ -164,47 +164,63 @@ Follow the prompts to select a user and set a new password.
 
 Employees can self-register through the frontend signup page. New users are assigned the `employee` role by default. Create an administrator using the backend seed command and its `ADMIN_NAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` settings. Public self-registration always creates employee accounts.
 
-## Deploying with Render and Vercel
+## Deploying on Vercel with Services
 
-The recommended arrangement is the Express API on Render and the Vite single-page application on Vercel. MongoDB must be reachable from Render. Vercel rewrites `/api/*` to Render so the browser uses the Vercel origin for API and session cookies. The repository includes a Render Blueprint in `render.yaml` and routes in `frontend/vercel.json`.
+The root `vercel.json` configures two services in one Vercel project: `employee-engagement-api` (Express, rooted at `backend`) and `frontend` (Vite, rooted at `frontend`). The API is public through `/api/*`; the frontend receives all other paths. Browser API and Socket.IO traffic stays on the project origin, so no Render hostname or Vercel service binding is needed. The API connects directly to MongoDB Atlas and, if enabled, to the separately hosted RAG agent.
 
 ### 1. Prepare MongoDB Atlas
 
-1. Create a MongoDB Atlas database and a dedicated database user with a strong unique password.
-2. Add the network access rule required for your Render service. Render outbound IP ranges vary by service and plan; use Atlas's documented Render connectivity options if available. Only use `0.0.0.0/0` if necessary, with database authentication and least-privilege access enabled.
-3. Copy the application connection string. Keep it private.
+1. Create an Atlas database and a dedicated database user with a strong unique password.
+2. Allow network access from Vercel. Use Vercel Secure Compute/static egress if available for your plan; otherwise use Atlas's documented connectivity guidance. If you allow `0.0.0.0/0`, use database authentication and least-privilege access.
+3. Use an Atlas replica set or sharded cluster. The Socket.IO MongoDB adapter uses change streams to distribute realtime events and creates a one-hour TTL index on its adapter-events collection.
+4. Copy the application connection string, such as `mongodb+srv://<user>:<password>@<cluster-host>/employee-engagement?retryWrites=true&w=majority`. URL-encode special characters in the password and keep this value private.
 
-### 2. Deploy the API to Render
+### 2. Deploy the Vercel project
 
-1. Push the repository to GitHub. Do not commit `.env` files.
-2. In Render, choose **New +**, then **Blueprint**, and connect this repository. Render reads `render.yaml`. The service root is `backend`, the build command is `npm ci`, the start command is `npm start`, and its health check is `/api/health`.
-3. Supply the `MONGODB_URI` connection string and `FRONTEND_URL`. You can initially use the Vercel production origin after creating the frontend deployment. Origins are exact and can be comma-separated, for example `https://your-project.vercel.app,https://www.your-domain.example`.
-4. Render generates `SESSION_SECRET`. Keep it private; rotating it invalidates existing sessions.
-5. Wait for the Render service to report healthy, then verify `https://YOUR-RENDER-SERVICE.onrender.com/api/health` returns JSON with `"status":"OK"`.
-6. Create the first administrator only after deployment, using a unique password of at least 12 characters. In Render's service Shell, from the backend service root, run `ADMIN_NAME='XYZ HR Administrator' ADMIN_EMAIL='hr-admin@your-domain.example' ADMIN_PASSWORD='<your-unique-secret>' npm run seed`, replacing the example name, email, and password with your own values. Do not use the literal example values. The command does not print the password and refuses to overwrite an existing account. Avoid saving the temporary password as a permanent service environment variable. Do not use any old local demo admin credentials.
+1. Push the repository to GitHub without committing `.env` files, API keys, or passwords.
+2. In Vercel, import the repository as one project and use the repository root as the project root. Do not set `frontend` as the project's Root Directory; each service root is declared in the root `vercel.json`.
+3. Vercel builds `backend` with `npm ci` and detects the Vite frontend from `frontend`. The catch-all rewrite routes SPA paths such as `/login`, `/employee`, and `/admin` to the frontend service.
+4. Add the backend environment variables below in **Project Settings → Environment Variables**. Configure them for Production and Preview if both environments should connect to the database. Vercel service bindings are intentionally not used.
+5. Deploy and wait for both services to finish building. Check `https://<your-project>.vercel.app/api/health` for JSON containing `"status":"OK"`.
 
-### 3. Deploy the frontend to Vercel
+### 3. Required Vercel environment variables
 
-1. In Vercel, import the same GitHub repository as a separate project.
-2. Set **Root Directory** to `frontend`.
-3. Use the Vite defaults, or set build command to `npm run build` and output directory to `dist`.
-4. Replace `YOUR-RENDER-SERVICE` in the `/api/:path*` destination in `frontend/vercel.json` with the Render service hostname. Also set `VITE_API_URL` to that Render origin for the Socket.IO connection.
-5. Deploy. The `frontend/vercel.json` routes support API calls and direct navigation to pages such as `/login`, `/signup`, `/employee`, and `/admin`.
-6. Copy the exact Vercel production origin into Render's `FRONTEND_URL` setting, then redeploy the API. If Vercel preview deployments should also call the API or Socket.IO, add their exact origins to the comma-separated allowlist. Redeploy after changing environment variables.
+| Variable | Value |
+|---|---|
+| `MONGODB_URI` | Atlas connection string for the application database |
+| `SESSION_SECRET` | Long, random secret; generate a unique value |
+| `SOCKET_TOKEN_SECRET` | A different long, random secret |
+| `FRONTEND_URL` | Exact stable Vercel production origin, e.g. `https://your-project.vercel.app` |
+| `FEEDBACK_SLA_HOURS` | `72` or another value from 1 through 720 |
 
-### 4. Production setup and smoke test
+Set `FRONTEND_URL` to the stable production `.vercel.app` origin, without a path or trailing slash. The backend also allows the current deployment's `VERCEL_URL` origin, which supports preview deployments. Do not set `VITE_API_URL` on Vercel; production Socket.IO uses the same Vercel origin and `/api/socket.io`.
 
-- Employee accounts can register at `/signup`. Administrator accounts must be provisioned separately as described above.
-- The Vercel API rewrite proxies requests through the Vercel origin, which keeps session cookies first-party. The Render API itself also needs `SESSION_SECRET`, `SOCKET_TOKEN_SECRET`, and `FRONTEND_URL`.
-- Check the Render health endpoint, sign in as the provisioned administrator, register an employee, submit feedback, reply as HR, and confirm the employee can see the conversation.
-- Render free services may sleep when idle, which can make the first request slow. Socket.IO and the API are served by the same Render service.
-- Existing feedback/questionnaire AI also needs the appropriate server-side provider configuration if those features are required. Never put provider credentials in `VITE_*` variables.
+Optional feedback-related AI features can use server-side `AI_PROVIDER=gemini`, `GEMINI_API_KEY`, and `GEMINI_MODEL=gemini-2.0-flash`. Never expose API keys in `VITE_*` variables.
+
+The employee RAG assistant is a separate Python service. Leave its URL/authentication settings unset and keep `RAG_AGENT_AUTH_VERIFIED=false` unless you have separately deployed it with HTTPS and verified its authentication. Do not expose the unauthenticated local Flask server.
+
+### 4. Create the first admin and test
+
+Create the initial admin using the production database. In PowerShell, temporarily set the environment values and run the seed script:
+
+```powershell
+$env:MONGODB_URI = "your-production-atlas-connection-string"
+$env:ADMIN_NAME = "Your HR Admin"
+$env:ADMIN_EMAIL = "you@example.com"
+$env:ADMIN_PASSWORD = "your-unique-password-of-at-least-12-characters"
+npm --prefix backend run seed
+Remove-Item Env:ADMIN_NAME, Env:ADMIN_EMAIL, Env:ADMIN_PASSWORD, Env:MONGODB_URI
+```
+
+Use your own values; do not commit or permanently store the password. The seed command refuses to overwrite an existing account.
+
+Then register an employee at `/signup`, submit feedback, and check admin assignment, replies, CSV export, session persistence, and realtime updates. Vercel free-plan usage and function duration/concurrency limits apply. Vercel's current WebSocket support is required for Socket.IO; MongoDB change streams distribute events across function instances.
 
 ### Important RAG deployment limitation
 
-The current RAG Agent is a separate Python application that depends on a local Ollama model and Chroma handbook index. `127.0.0.1` in the Render API environment refers to the Render API container, not your computer. The local demo agent is not publicly reachable from Render. The production backend intentionally refuses employee RAG questions unless a verified upstream authentication header is configured.
+The current RAG Agent is a separate Python application that depends on a local Ollama model and Chroma handbook index. `127.0.0.1` in the Vercel API environment refers to the function, not your computer. The local demo agent is not publicly reachable from Vercel. The production backend intentionally refuses employee RAG questions unless a verified upstream authentication header is configured.
 
-Before enabling employee RAG in production, deploy the existing RAG service and its model/index to an appropriately persistent host, require HTTPS and agent-side authentication, and remove sensitive question/output logging. Then configure `RAG_AGENT_URL`, `RAG_AGENT_AUTH_HEADER`, and `RAG_AGENT_AUTH_VALUE` on Render, verify the upstream actually enforces that header, and only then set `RAG_AGENT_AUTH_VERIFIED=true`. Do not expose the unauthenticated local Flask development server to the public internet. If these steps are not complete, the web app can still be hosted, but RAG chat will remain unavailable by design.
+Before enabling employee RAG in production, deploy the existing RAG service and its model/index to an appropriately persistent host, require HTTPS and agent-side authentication, and remove sensitive question/output logging. Then configure `RAG_AGENT_URL`, `RAG_AGENT_AUTH_HEADER`, and `RAG_AGENT_AUTH_VALUE` on Vercel, verify the upstream actually enforces that header, and only then set `RAG_AGENT_AUTH_VERIFIED=true`. Do not expose the unauthenticated local Flask development server to the public internet. If these steps are not complete, the web app can still be hosted, but RAG chat will remain unavailable by design.
 
 ## Usage
 

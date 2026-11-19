@@ -6,9 +6,11 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const session = require('express-session');
 const { MongoStore } = require('connect-mongo');
+const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 const mongoSanitize = require('express-mongo-sanitize');
+const { createAdapter } = require('@socket.io/mongo-adapter');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 const { connectDB } = require('./utils/db');
 const { createCsrfProtection } = require('./middleware/csrf');
@@ -19,7 +21,7 @@ const defaultFrontendOrigins = [
   'http://localhost:5174',
   'http://localhost:5175'
 ];
-const frontendOrigins = process.env.FRONTEND_URL
+const configuredFrontendOrigins = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(',').map((origin) => {
     try {
       const parsedOrigin = new URL(origin.trim());
@@ -32,6 +34,13 @@ const frontendOrigins = process.env.FRONTEND_URL
     }
   })
   : defaultFrontendOrigins;
+const deploymentOrigin = process.env.VERCEL_URL
+  ? new URL(`https://${process.env.VERCEL_URL}`).origin
+  : null;
+const frontendOrigins = [...new Set([
+  ...configuredFrontendOrigins,
+  ...(deploymentOrigin ? [deploymentOrigin] : [])
+])];
 
 const app = express();
 const sessionSecret = process.env.SESSION_SECRET;
@@ -42,10 +51,31 @@ if (!sessionSecret) {
 app.set('trust proxy', 1);
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
+  path: '/api/socket.io',
   cors: { origin: frontendOrigins, credentials: true }
 });
 app.set('io', io);
-io.use((socket, next) => {
+const dbReady = connectDB().then(async () => {
+  if (process.env.VERCEL) {
+    const adapterEvents = mongoose.connection.db.collection('socket.io-adapter-events');
+    await adapterEvents.createIndex(
+      { createdAt: 1 },
+      { expireAfterSeconds: 3600, background: true }
+    );
+    io.adapter(createAdapter(adapterEvents, { addCreatedAtField: true }));
+  }
+});
+dbReady.catch((error) => {
+  console.error('Unable to initialize the database or realtime adapter:', error.message);
+});
+
+io.use(async (socket, next) => {
+  try {
+    await dbReady;
+  } catch {
+    return next(new Error('Realtime service is unavailable.'));
+  }
+
   const token = socket.handshake.auth?.token;
   if (typeof token !== 'string' || !process.env.SOCKET_TOKEN_SECRET) {
     return next(new Error('Socket authentication required.'));
@@ -104,6 +134,15 @@ app.use(session({
 
 app.use(createCsrfProtection(frontendOrigins));
 
+app.use(async (req, res, next) => {
+  try {
+    await dbReady;
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -139,13 +178,17 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5002;
-connectDB()
-  .then(() => {
-    httpServer.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+if (process.env.VERCEL) {
+  module.exports = httpServer;
+} else {
+  dbReady
+    .then(() => {
+      httpServer.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+      });
+    })
+    .catch(() => {
+      process.exitCode = 1;
     });
-  })
-  .catch((error) => {
-    console.error('Unable to start server:', error.message);
-    process.exitCode = 1;
-  });
+  module.exports = httpServer;
+}
