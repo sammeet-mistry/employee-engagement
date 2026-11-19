@@ -1,48 +1,50 @@
 const mongoose = require('mongoose');
+const path = require('path');
 const User = require('./models/User');
-require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
-const resetPassword = async () => {
+const getResetConfig = (env) => {
+  const email = env.RESET_ADMIN_EMAIL?.trim().toLowerCase();
+  const password = env.RESET_ADMIN_PASSWORD;
+
+  if (!env.MONGODB_URI) {
+    throw new Error('MONGODB_URI is not configured.');
+  }
+  if (!email) {
+    throw new Error('RESET_ADMIN_EMAIL is required.');
+  }
+  if (typeof password !== 'string' || password.length < 12) {
+    throw new Error('RESET_ADMIN_PASSWORD must be at least 12 characters long.');
+  }
+
+  return { mongoUri: env.MONGODB_URI, email, password };
+};
+
+const resetPassword = async (env = process.env) => {
+  const { mongoUri, email, password } = getResetConfig(env);
+
   try {
-    // Connect to MongoDB
-    const mongoUri = process.env.MONGODB_URI || 'mongodb+srv://sammeetm:zuCkeV7dCPFb7xTp@cluster0.nzhlggd.mongodb.net/employee-feedback?retryWrites=true&w=majority';
     await mongoose.connect(mongoUri);
+    const user = await User.findOne({ email, role: 'admin' });
+    if (!user) {
+      throw new Error(`No administrator account exists for ${email}.`);
+    }
 
-    console.log('Connected to MongoDB');
-
-    // Ask for user email
-    const readline = require('readline');
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout
-    });
-
-    rl.question('Enter the email of the user whose password you want to reset: ', async (email) => {
-      const user = await User.findOne({ email });
-
-      if (!user) {
-        console.log('User not found with email:', email);
-        rl.close();
-        mongoose.connection.close();
-        return;
-      }
-
-      rl.question('Enter new password: ', async (newPassword) => {
-        user.password = newPassword; // Will be hashed by pre-save hook
-        await user.save();
-
-        console.log(`Password reset successfully for user: ${user.name} (${user.email})`);
-        console.log('New password:', newPassword);
-
-        rl.close();
-        mongoose.connection.close();
-      });
-    });
-
-  } catch (error) {
-    console.error('Error resetting password:', error);
-    process.exit(1);
+    user.password = password;
+    await user.save();
+    console.log('Administrator password reset successfully.');
+  } finally {
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.disconnect();
+    }
   }
 };
 
-resetPassword();
+if (require.main === module) {
+  resetPassword().catch((error) => {
+    console.error('Unable to reset administrator password:', error.message);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { getResetConfig, resetPassword };

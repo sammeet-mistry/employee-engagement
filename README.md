@@ -154,11 +154,7 @@ The employee row above is an example, not a pre-seeded account. No employee demo
 
 #### Password Reset
 
-To reset an existing user's password, run:
-```bash
-npm run reset-password
-```
-Follow the prompts to select a user and set a new password.
+To reset an existing administrator, provide `MONGODB_URI`, `RESET_ADMIN_EMAIL`, and `RESET_ADMIN_PASSWORD` in the backend environment, then run `npm run reset-password` from `backend`. The password must be at least 12 characters. The script only updates an existing administrator, has no default database URI, and never prints the password. Use your deployment provider's secret settings rather than putting the password in a command or shell history, and remove the reset variables after the operation.
 
 ### User Registration
 
