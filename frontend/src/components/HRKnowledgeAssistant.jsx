@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FiArrowUpRight, FiCheck, FiChevronRight, FiPlus, FiRefreshCw, FiSend, FiShield, FiX } from 'react-icons/fi';
+import { FiArrowUpRight, FiCheck, FiChevronRight, FiPlus, FiRefreshCw, FiSend, FiShield, FiTrash2, FiX } from 'react-icons/fi';
 import axios from '../utils/axios';
 import { formatFullDateTime } from '../utils/date';
 import socket from '../utils/socket';
@@ -176,6 +176,28 @@ const HRKnowledgeAssistant = () => {
     } catch (error) {
       setRetryAction('message');
       setErrorMessage(error.response?.data?.message || 'Unable to send your question. Your draft is still here so you can retry.');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const deleteOpenChat = async () => {
+    if (!activeSession || activeSession.status !== 'active' || activeSession.feedbackId || isSending) return;
+    if (!window.confirm('Delete this open conversation? This cannot be undone.')) return;
+    setIsSending(true);
+    setErrorMessage('');
+    setStatusMessage('');
+    try {
+      await axios.delete(`/api/chat/session/${activeSession._id}`);
+      setSessions((previous) => previous.filter((session) => session._id !== activeSession._id));
+      activeSessionRef.current = null;
+      setActiveSession(null);
+      setMessage('');
+      setRetryAction(null);
+      setStatusMessage('Open conversation deleted.');
+      await loadSessions(sessionsPage);
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || 'Unable to delete this conversation. Please try again.');
     } finally {
       setIsSending(false);
     }
@@ -400,6 +422,11 @@ const HRKnowledgeAssistant = () => {
                     <button type="button" className="rag-text-button" onClick={() => setConfirmAction('escalate')} disabled={isSending}>
                       Request HR follow-up
                     </button>
+                    {!activeSession.feedbackId && (
+                      <button type="button" className="rag-text-button" onClick={deleteOpenChat} disabled={isSending}>
+                        <FiTrash2 aria-hidden="true" /> Delete open chat
+                      </button>
+                    )}
                   </>
                 )}
                 <span>Responses are informational and do not replace HR review.</span>

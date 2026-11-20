@@ -261,7 +261,9 @@ const addAdminMessage = async (req, res) => {
 
 const deleteChatSession = async (req, res) => {
   try {
-    const session = await ChatSession.findById(req.params.sessionId);
+    const query = { _id: req.params.sessionId };
+    if (req.user.role !== 'admin') query.user = req.user.id;
+    const session = await ChatSession.findOne(query);
     if (!session) return res.status(404).json({ message: 'Conversation not found.' });
     if (session.status !== 'active' || session.feedbackId) {
       return res.status(409).json({ message: 'Only open chats that have not been sent to HR can be deleted.' });
