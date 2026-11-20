@@ -1,756 +1,223 @@
-# Employee Engagement Platform
+﻿# Employee Engagement Platform
 
-A full-stack employee engagement platform for feedback submissions, HR follow-up, and role-based administration. Employee chat uses a server-side adapter for the organization's existing retrieval-augmented HR knowledge agent; the agent itself is maintained separately and must be running and securely configured for chat to answer questions.
+A full-stack employee engagement and HR support platform developed as a college major project. Employees can submit and track feedback, communicate with HR, and use an HR knowledge assistant. Administrators can manage feedback, review activity, and support employees through role-protected tools.
 
-**Last Updated**: August 30, 2026 | **Version**: 1.2.0
+> **Project status:** Updated November 19, 2026. The web application and backend are maintained in this repository. The HR RAG agent is a separate service and must be securely deployed and configured before employee knowledge chat is available in production.
 
-## Features
+## Highlights
 
-### Core Features
-- **Employee Dashboard**: Responsive workspace for employee profile context, feedback history, filtering, guided submissions, and HR resource conversations
-- **Admin Dashboard**: Feedback management, conversation oversight, response approval, scenario management, and review queue
-- **Feedback AI**: Existing OpenAI/Gemini services support feedback questionnaires, feedback processing, and admin reply drafting; they do not power employee chat
-- **Scenario Matching**: MongoDB-backed scenario matching and admin review queue remain separate from document retrieval
-- **HR Knowledge Assistant**: Chat contract boundary for the approved RAG agent, with source references, no-source handling, and HR escalation support
-- **Feedback Management**: AI-enhanced feedback forms, employee and HR message threads, question generation, refinement suggestions, and categorization
-- **Role-based Access**: MongoDB-backed server-side sessions with HTTP-only cookies, CSRF protection, and employee/admin permissions
-- **Employee Activity Summary**: Counts are derived from the signed-in employee's stored feedback; no unsupported analytics are displayed
-- **Professional UI**: Enterprise-grade design with Tailwind CSS and fully responsive components
+- Employee and administrator dashboards with role-based access.
+- Feedback submission, status tracking, HR replies, filtering, pagination, and CSV export.
+- Admin audit history and privacy protections for anonymous feedback.
+- HR chat session history, escalation to HR, and a separate adapter for an existing RAG knowledge service.
+- Realtime updates through Socket.IO, with MongoDB-backed session and event support.
+- CSRF protection, secure session cookies, password hashing, and guarded administrator provisioning/reset workflows.
+- Optional AI support for feedback and admin workflows. This is separate from the HR knowledge assistant.
 
-### Advanced Features (Jul 17 - Aug 30)
-- **Batch Operations**: Bulk feedback approval, status updates, and reply management from admin dashboard
-- **Advanced Filtering & Search**: Multi-field filtering, date range queries, sentiment analysis, and department-based segmentation
-- **Feedback CSV Export**: Admins can download all feedback on demand, use the active feedback filters, and preserve submitter privacy for anonymous entries
-- **Paginated History**: Feedback lists and employee/admin chat-session lists load in bounded pages
-- **Anonymous Feedback Privacy**: Admin API responses and exports omit submitter identity for anonymous entries
-- **Admin Audit History**: Records feedback CSV exports, assignment/status changes, and reply actions for admin review
-- **HR Assignment & SLA**: Assign feedback to an HR admin, track a configurable response deadline, and surface overdue items
-- **Notification System**: Email notifications for feedback responses, escalations, and admin alerts
-- **Performance Analytics**: Response time tracking, user engagement scoring, and effectiveness metrics
-- **Data Validation**: Enhanced input validation, sanitization, and schema enforcement at both frontend and backend
-- **Error Handling**: Improved error messages, retry mechanisms, and graceful degradation
-- **Caching Strategy**: Redis-backed caching for frequently accessed scenarios and user sessions
-- **Background Jobs**: Async processing for AI response generation and batch exports using job queues
+## Architecture and technology
 
-## Tech Stack
-
-- **Frontend**: React.js + Vite, Tailwind CSS, Redux Toolkit, Axios for HTTP client
-- **Backend**: Node.js + Express.js, MongoDB + Mongoose, Socket.IO for real-time communication
-- **Authentication**: MongoDB-backed sessions, secure cookies, CSRF validation, and bcrypt password hashing
-- **Feedback AI Services**: OpenAI API or Google Gemini API for the existing feedback/questionnaire and admin workflows
-- **Caching & Jobs**: Redis for caching and Bull for job queue management (added Aug 15)
-- **Testing**: Node's built-in test runner for backend utilities and middleware
-- **Security**: Helmet, CORS, Rate Limiting, Input Validation, SQL injection prevention
-- **Monitoring**: Winston logging, performance metrics, error tracking
-
-## Setup Instructions
-
-### Prerequisites
-
-- Node.js (v18 or higher)
-- MongoDB (local or cloud instance)
-- An OpenAI or Google Gemini API key for existing feedback/questionnaire and admin AI workflows (optional for the separately configured HR knowledge assistant)
-
-### Backend Setup
-
-1. Navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Create a `.env` file in the backend directory:
-   ```env
-   MONGODB_URI=mongodb://localhost:27017/employee-engagement
-   SESSION_SECRET=generate-a-long-random-secret
-   SOCKET_TOKEN_SECRET=replace-with-another-long-random-secret
-   FEEDBACK_SLA_HOURS=72
-   FRONTEND_URL=http://localhost:5173
-   # These provider settings are for feedback/questionnaire and admin AI only.
-   # Employee chat does not call either provider.
-   AI_PROVIDER=gemini
-   GEMINI_API_KEY=your-google-gemini-api-key-here
-   GEMINI_MODEL=gemini-2.0-flash
-   PORT=5002
-   
-   # Optional: Redis configuration for caching (added Aug 15)
-   REDIS_URL=redis://localhost:6379
-   
-   # Optional: Email service for notifications (added Aug 20)
-   EMAIL_SERVICE=gmail
-   EMAIL_USER=your-email@gmail.com
-   EMAIL_PASSWORD=your-app-password
-   ```
-   Replace `SESSION_SECRET` with a randomly generated value; do not use the example text in a real deployment.
-
-   To use OpenAI for the existing feedback-related AI workflows instead, set `AI_PROVIDER=openai` and `OPENAI_API_KEY`. These settings do not connect the RAG agent.
-
-4. Start MongoDB locally (if not already running):
-   ```bash
-   mongod
-   ```
-
-5. (Optional) Start Redis for caching:
-   ```bash
-   redis-server
-   ```
-
-6. Seed admin user:
-   ```bash
-   npm run seed
-   ```
-   Set `ADMIN_NAME`, `ADMIN_EMAIL`, and a unique `ADMIN_PASSWORD` of at least 12 characters in the backend environment first. The seed command creates a new administrator only; it will not delete or overwrite an existing account.
-
-7. Start the backend server:
-   ```bash
-   npm run dev
-   ```
-   Server will be available at `http://localhost:5002`
-
-8. (Optional) Run tests:
-   ```bash
-   npm test
-   ```
-
-### Frontend Setup
-
-1. Open a new terminal and navigate to the frontend directory:
-   ```bash
-   cd frontend
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
-   Frontend will be available at `http://localhost:5173`
-
-4. (Optional) Build for production:
-   ```bash
-   npm run build
-   ```
-
-In development, Vite proxies `/api` requests to `http://localhost:5002`.
-
-### Sign-in examples
-
-Open the frontend at `http://localhost:5173/login`:
-
-| Account | Email | Password | How it is created |
-|---|---|---|---|
-| HR / Administration | The `ADMIN_EMAIL` value you configured | The `ADMIN_PASSWORD` value you configured | Set the administrator environment values, then run `cd backend` and `npm run seed` |
-| Employee | `employee.demo@company.com` | The password you chose during registration | Open `http://localhost:5173/signup` and create an account; self-registration assigns the `employee` role |
-
-The employee row above is an example, not a pre-seeded account. No employee demo account is currently created by `seed.js`. Do not reuse local demonstration account credentials in production.
-
-#### Password Reset
-
-To reset an existing administrator, provide `MONGODB_URI`, `RESET_ADMIN_EMAIL`, and `RESET_ADMIN_PASSWORD` in the backend environment, then run `npm run reset-password` from `backend`. The password must be at least 12 characters. The script only updates an existing administrator, has no default database URI, and never prints the password. Use your deployment provider's secret settings rather than putting the password in a command or shell history, and remove the reset variables after the operation.
-
-### User Registration
-
-Employees can self-register through the frontend signup page. New users are assigned the `employee` role by default. Create an administrator using the backend seed command and its `ADMIN_NAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` settings. Public self-registration always creates employee accounts.
-
-## Deploying on Vercel with Services
-
-The root `vercel.json` configures two services in one Vercel project: `employee-engagement-api` (Express, rooted at `backend`) and `frontend` (Vite, rooted at `frontend`). The API is public through `/api/*`; the frontend receives all other paths. Browser API and Socket.IO traffic stays on the project origin, so no Render hostname or Vercel service binding is needed. The API connects directly to MongoDB Atlas and, if enabled, to the separately hosted RAG agent.
-
-### 1. Prepare MongoDB Atlas
-
-1. Create an Atlas database and a dedicated database user with a strong unique password.
-2. Allow network access from Vercel. Use Vercel Secure Compute/static egress if available for your plan; otherwise use Atlas's documented connectivity guidance. If you allow `0.0.0.0/0`, use database authentication and least-privilege access.
-3. Use an Atlas replica set or sharded cluster. The Socket.IO MongoDB adapter uses change streams to distribute realtime events and creates a one-hour TTL index on its adapter-events collection.
-4. Copy the application connection string, such as `mongodb+srv://<user>:<password>@<cluster-host>/employee-engagement?retryWrites=true&w=majority`. URL-encode special characters in the password and keep this value private.
-
-### 2. Deploy the Vercel project
-
-1. Push the repository to GitHub without committing `.env` files, API keys, or passwords.
-2. In Vercel, import the repository as one project and use the repository root as the project root. Do not set `frontend` as the project's Root Directory; each service root is declared in the root `vercel.json`.
-3. Vercel builds `backend` with `npm ci` and detects the Vite frontend from `frontend`. The catch-all rewrite routes SPA paths such as `/login`, `/employee`, and `/admin` to the frontend service.
-4. Add the backend environment variables below in **Project Settings → Environment Variables**. Configure them for Production and Preview if both environments should connect to the database. Vercel service bindings are intentionally not used.
-5. Deploy and wait for both services to finish building. Check `https://<your-project>.vercel.app/api/health` for JSON containing `"status":"OK"`.
-
-### 3. Required Vercel environment variables
-
-| Variable | Value |
+| Layer | Technologies |
 |---|---|
-| `MONGODB_URI` | Atlas connection string for the application database |
-| `SESSION_SECRET` | Long, random secret; generate a unique value |
-| `SOCKET_TOKEN_SECRET` | A different long, random secret |
-| `FEEDBACK_SLA_HOURS` | `72` or another value from 1 through 720 |
+| Frontend | React, Vite, Redux Toolkit, Axios, Socket.IO client |
+| Backend | Node.js, Express, Mongoose, Socket.IO |
+| Database | MongoDB; Atlas for hosted deployments |
+| AI integrations | Configurable OpenAI/Gemini for feedback workflows; separately hosted Python/Ollama/Chroma RAG agent for HR knowledge chat |
+| Deployment | Vercel configuration for frontend/API; Render configuration is also included |
 
-The backend automatically allows Vercel's `VERCEL_PROJECT_PRODUCTION_URL` and current deployment's `VERCEL_URL`, so no `FRONTEND_URL` setting is required for the Vercel project. If you add a custom frontend domain later, set `FRONTEND_URL` to its exact HTTPS origin. Do not set `VITE_API_URL` on Vercel; production Socket.IO uses the same Vercel origin and `/api/socket.io`.
+The RAG agent is not bundled into this repository. Do not assume employee chat is production-ready solely because the web application is deployed.
 
-Optional feedback-related AI features can use server-side `AI_PROVIDER=gemini`, `GEMINI_API_KEY`, and `GEMINI_MODEL=gemini-2.0-flash`. Never expose API keys in `VITE_*` variables.
+## Full feature and component inventory
 
-The employee RAG assistant is a separate Python service. Leave its URL/authentication settings unset and keep `RAG_AGENT_AUTH_VERIFIED=false` unless you have separately deployed it with HTTPS and verified its authentication. Do not expose the unauthenticated local Flask server.
+This section summarizes the application as it has evolved from its initial employee feedback workflow through the current HR assistant, admin, security, and deployment work. A capability described as optional depends on its provider or deployment configuration.
 
-### 4. Create the first admin and test
+### Employee experience
 
-Create the initial admin using the production database. In PowerShell, temporarily set the environment values and run the seed script:
+- Landing, sign-in, and employee self-registration screens with role-safe registration.
+- Employee dashboard with overview, personal feedback history, search/filter/sort controls, and guided feedback submission.
+- Feedback questionnaire flow with question generation, draft refinement, summary/category/tag suggestions, and mood indicators. AI-backed functions depend on configured provider access; deterministic questionnaire questions and fallback behavior are also present.
+- Feedback privacy choice, submission status, and threaded follow-up messages with HR.
+- HR knowledge assistant with persisted chat sessions, cited source display when supplied by the upstream service, retry/no-source states, and explicit HR escalation/follow-up.
+
+### HR and administrator experience
+
+- Admin dashboard and section navigation for feedback management and chat oversight.
+- Feedback filtering, pagination, status/assignment workflows, response drafting, review/approval, and CSV export.
+- Anonymous feedback privacy handling in administrator responses and exports.
+- Feedback conversation threads between employees and HR.
+- Scenario management and unmatched-scenario review queue, including trigger matching, similarity scoring, safety phrase checks, and usage tracking.
+- Administrator audit history for supported administrative actions.
+- Protected administrator-only pages and APIs; administrator account seeding and a guarded password reset utility.
+
+### Frontend component map
+
+- **Application and navigation:** `App`, `Layout`, `ProtectedRoute`, `AuthLayout`, `LandingPage`, `LoginPage`, `SignUpPage`.
+- **Employee workflow:** `EmployeeDashboard`, `FeedbackForm`, `AIQuestionnaire`, `FeedbackList`, `FeedbackConversation`, `HRKnowledgeAssistant`.
+- **Administrator workflow:** `AdminDashboard`, `AdminSectionNav`, `FeedbackTable`, `FeedbackFilters`, `ReplyModal`, `AdminChatSessions`, `AdminAuditLog`, `ScenarioManagementPage`, `ScenarioReviewQueuePage`.
+- **Shared UI:** `StatsCards`, `Pagination`, `LoadingSpinner`, `ContentSkeleton`.
+- **Client state and transport:** Redux store with `authSlice` and `feedbackSlice`; Axios API helper; Socket.IO client helper; date utility; shared responsive styles.
+
+### Backend component map
+
+- **HTTP application:** Express server, health endpoint, route registration, database startup, error handling, CORS, and request parsing.
+- **API areas:** authentication, feedback, administrator, and chat routes/controllers; scenario controller and scenario review endpoints.
+- **Persistence models:** user, feedback, reply, chat session, scenario, unmatched scenario, and administrator audit log, stored through Mongoose.
+- **Authentication and security:** MongoDB-backed Express sessions, bcrypt password hashing, role/ownership authorization, CSRF middleware, security headers, request rate limiting, Mongo query sanitization, and authenticated Socket.IO handshakes.
+- **Business utilities:** request validation, AI assistance, scenario matching, RAG-agent adapter, feedback privacy shaping, CSV generation, pagination, audit recording, and realtime event helpers.
+- **Realtime delivery:** Socket.IO events with MongoDB adapter support for multi-instance deployments.
+- **Maintenance and quality:** administrator seed/reset scripts and Node's built-in test runner with focused tests for reset behavior, CSRF, AI usage, CSV privacy/export, pagination, and realtime behavior.
+
+## Technology stack across the project
+
+| Area | Technologies used |
+|---|---|
+| Web client | React 18, JavaScript/JSX, Vite, React Router, Tailwind CSS, PostCSS, Autoprefixer |
+| Client state and UI | Redux Toolkit, React Redux, Axios, Framer Motion, React Icons |
+| API server | Node.js 18+, Express 4 |
+| Data and sessions | MongoDB, Mongoose, `connect-mongo`, `express-session` |
+| Realtime | Socket.IO and Socket.IO client; MongoDB Socket.IO adapter for distributed events |
+| AI and language services | OpenAI API (including embeddings where configured); Google Gemini REST API; separate Python RAG service using Flask, Ollama, Chroma, and sentence-transformers in its own checkout |
+| Validation and protection | `express-validator`, Helmet, CORS, express-rate-limit, express-mongo-sanitize, bcryptjs, JSON Web Tokens for socket authentication |
+| Build and development | npm, Vite, PostCSS, Tailwind CSS, Nodemon; Node built-in `node:test` runner |
+| Hosting configuration | Vercel and Render configuration; MongoDB Atlas as the hosted database option |
+
+The repository's package manifests are authoritative for installed dependencies. Redis and email providers appeared in earlier planning/documentation but are not current direct dependencies in this repository; treat them as historical/optional only unless separately configured by a deployment. The RAG service is maintained separately and is not part of this repository's Node dependency tree.
+
+### Development milestones
+
+- **Initial project foundation:** employee feedback submission and administration, account access, MongoDB-backed records, and the React/Node web application.
+- **AI and scenario workflows:** guided questionnaires, feedback summarization/refinement, AI-assisted HR replies, sentiment/category suggestions, scenario matching, and review of unmatched cases.
+- **Employee and HR collaboration:** personal dashboards, feedback conversations, chat sessions, escalation paths, and realtime updates.
+- **Security and operations:** role-based authorization, secure server-side sessions, CSRF protection, audit history, anonymous-feedback privacy, pagination, CSV export, and controlled administrator provisioning/reset.
+- **Knowledge assistant integration:** a backend adapter to the separately maintained HR RAG agent, with source-aware responses and explicit availability/security boundaries.
+- **Deployment and documentation:** local setup plus Vercel/Render configuration and environment templates; production integrations still require provider credentials and secured services.
+## Repository layout
+
+```text
+backend/                 Express API, models, middleware, services, tests
+frontend/                React application
+vercel.json              Vercel multi-service routing
+render.yaml              Render service configuration
+README.md                Setup, configuration, deployment, and project guide
+UPDATE_LOG.md             Chronological project change log
+```
+
+## Requirements
+
+- Node.js 18 or later and npm
+- MongoDB connection string
+- Optional: Redis and email provider for features enabled by the deployment
+- Optional: OpenAI or Gemini credentials for feedback/admin AI features
+- Optional and separate: secured RAG agent URL and authentication for employee HR knowledge chat
+
+## Local setup
+
+### 1. Configure the backend
 
 ```powershell
-$env:MONGODB_URI = "your-production-atlas-connection-string"
-$env:ADMIN_NAME = "Your HR Admin"
-$env:ADMIN_EMAIL = "you@example.com"
-$env:ADMIN_PASSWORD = "your-unique-password-of-at-least-12-characters"
-npm --prefix backend run seed
-Remove-Item Env:ADMIN_NAME, Env:ADMIN_EMAIL, Env:ADMIN_PASSWORD, Env:MONGODB_URI
+cd backend
+npm install
+Copy-Item .env.example .env
 ```
 
-Use your own values; do not commit or permanently store the password. The seed command refuses to overwrite an existing account.
+Edit `backend/.env` with the values for your machine. At minimum, configure:
 
-Then register an employee at `/signup`, submit feedback, and check admin assignment, replies, CSV export, session persistence, and realtime updates. Vercel free-plan usage and function duration/concurrency limits apply. Vercel's current WebSocket support is required for Socket.IO; MongoDB change streams distribute events across function instances.
+```env
+MONGODB_URI=mongodb://127.0.0.1:27017/employee-engagement
+SESSION_SECRET=<long-random-secret>
+SOCKET_TOKEN_SECRET=<different-long-random-secret>
+FRONTEND_URL=http://localhost:5173
+FEEDBACK_SLA_HOURS=72
+PORT=5002
+```
 
-### Important RAG deployment limitation
+Use the checked-in `backend/.env.example` as the source of truth for supported backend variables. Add provider credentials only for features you intend to enable. Never commit `.env` files or real secrets.
 
-The current RAG Agent is a separate Python application that depends on a local Ollama model and Chroma handbook index. `127.0.0.1` in the Vercel API environment refers to the function, not your computer. The local demo agent is not publicly reachable from Vercel. The production backend intentionally refuses employee RAG questions unless a verified upstream authentication header is configured.
+Start MongoDB, then create an administrator using configured `ADMIN_NAME`, `ADMIN_EMAIL`, and a unique `ADMIN_PASSWORD` of at least 12 characters:
 
-Before enabling employee RAG in production, deploy the existing RAG service and its model/index to an appropriately persistent host, require HTTPS and agent-side authentication, and remove sensitive question/output logging. Then configure `RAG_AGENT_URL`, `RAG_AGENT_AUTH_HEADER`, and `RAG_AGENT_AUTH_VALUE` on Vercel, verify the upstream actually enforces that header, and only then set `RAG_AGENT_AUTH_VERIFIED=true`. Do not expose the unauthenticated local Flask development server to the public internet. If these steps are not complete, the web app can still be hosted, but RAG chat will remain unavailable by design.
+```powershell
+npm run seed
+```
 
-## Usage
+The seed operation creates an administrator and does not overwrite an existing account. To reset an existing administrator, configure `RESET_ADMIN_EMAIL` and `RESET_ADMIN_PASSWORD` temporarily and run `npm run reset-password`; remove those values after use.
 
-1. Visit `http://localhost:5173` for the landing page
-2. Choose **Login** or **Sign Up**
-3. Use the administrator account you provisioned or register an employee account
-4. Employees can submit feedback and view responses
-5. Admins can manage feedback, generate AI replies, and approve responses
-6. Ask workplace questions in the HR knowledge assistant (requires the organization's RAG agent integration; see the status section above)
+Start the API:
 
-## Project Timeline & Implementation (Jul 17 - Aug 30, 2026)
-
-### Phase 1: Core System (Jul 17 - Jul 31)
-- ✅ User authentication system with server-side sessions and role-based access
-- ✅ Feedback submission and management system
-- ✅ Feedback questionnaire and admin AI workflows
-- ⏳ Employee RAG assistant adapter (waiting for the existing agent contract)
-- ✅ Admin dashboard for feedback oversight
-- ✅ Chat session management
-- ✅ Real-time notifications via Socket.IO
-
-### Phase 2: Advanced Features (Aug 1 - Aug 15)
-- ✅ Scenario knowledge base with similarity matching
-- ✅ Admin review queue for unmatched scenarios
-- ✅ Advanced filtering and search on feedback
-- ✅ Analytics dashboard with metrics
-- ✅ Redis caching implementation
-- ✅ Background job processing with Bull queue
-- ✅ Email notification system
-
-### Phase 3: Quality & Testing (Aug 16 - Aug 30)
-- ✅ Comprehensive unit test suite
-- ✅ API integration tests
-- ✅ Component and Redux testing
-- ✅ End-to-end user journey tests
-- ✅ Security testing and input validation
-- ✅ Performance and load testing
-- ✅ Test coverage reporting (87% backend, 82% frontend)
-- ✅ Documentation and README updates
-- ✅ Error handling improvements
--  Data export functionality (CSV/PDF) [WIP]
-
-## API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - Register new user with validation
-- `POST /api/auth/login` - Login and create a server-side session
-- `POST /api/auth/logout` - Destroy the current server-side session
-- `GET /api/auth/csrf` - Get a CSRF token for a state-changing request
-- `GET /api/auth/profile` - Get authenticated user profile (Protected)
-
-### Employee HR Knowledge Assistant
-All chat routes require an authenticated server-side session. Employee session queries and mutations are scoped to the authenticated employee; only admin routes can list all sessions or add an HR/admin message.
-
-- `POST /api/chat/session` - Create an empty HR knowledge assistant conversation
-- `GET /api/chat/sessions/my` - Retrieve the authenticated employee's sessions
-- `GET /api/chat/sessions/all` - List sessions for the admin review surface (admin only)
-- `GET /api/chat/session/:sessionId` - Read a session (owner or admin)
-- `POST /api/chat/session/:sessionId/message` - Send a question through the RAG adapter
-- `POST /api/chat/session/:sessionId/send-to-hr` - Add the employee/assistant transcript to the employee's feedback history for HR follow-up
-- `POST /api/chat/session/:sessionId/escalate` - Mark a conversation for the existing HR conversation review queue
-- `POST /api/chat/session/:sessionId/admin-message` - Add an admin message (admin only)
-
-**RAG integration:** the adapter calls the existing [RAG-Agent Flask API](https://github.com/sammeet-mistry/RAG-Agent), `POST /ask` with `{"question":"..."}`. Its current response is `{"answer":"...","sources":["handbook.pdf - Page 12"]}`. The checked-in Flask API does not accept conversation history, does not return the `confidence` or structured source objects from the supplied example, and has no authentication. The adapter sends only the current question, maps actual source strings into title/page references, and treats responses without a real source as unreliable. It recognizes the agent's “couldn't find that information” response and “No sufficiently relevant source found” marker as no-answer results.
-
-The current RAG source code starts its subprocess with an empty in-memory conversation history for each request; conversation history is retained in this application's session but is not sent to the agent because its API has no history field. The checked-in ingestion script reads `data/handbook.pdf` into Chroma's `employee_handbook` collection under `vector_db`; confirm that PDF and indexed content are the currently approved HR sources before relying on answers. Scenario matching remains a separate safety/routing feature and is not document retrieval.
-
-For local development, set backend-only `RAG_AGENT_URL=http://127.0.0.1:5000/ask` and start the Flask service with `python app.py` from the RAG-Agent repository. Set `RAG_AGENT_TIMEOUT_MS` if the default 185-second client timeout needs to match agent deployment latency. No provider keys or RAG credentials belong in Vite variables. In production the adapter refuses requests unless `RAG_AGENT_AUTH_HEADER`, `RAG_AGENT_AUTH_VALUE`, and `RAG_AGENT_AUTH_VERIFIED=true` are configured. The current Flask route does not validate an auth header, so these variables alone do not secure it: implement and verify matching authentication in the agent before setting the verification flag or deploying it.
-
-#### Local Windows demo setup
-
-The employee-engagement repository does not include the separate RAG-Agent checkout. If both repositories are sibling folders, start the demo like this:
-
-1. Start from the employee-engagement repository root. Make sure MongoDB is running and Ollama has the `llama3.2` model available.
-2. In a terminal, switch to the sibling RAG-Agent folder, create its local Python environment, and install its runtime dependencies if needed:
-   ```powershell
-   cd ..\RAG-Agent
-   python -m venv .venv
-   .\.venv\Scripts\python.exe -m pip install flask chromadb ollama sentence-transformers
-   .\.venv\Scripts\python.exe app.py
-   ```
-   The existing checkout should contain `data\handbook.pdf` and the populated `vector_db` index. Keep this Flask development service bound to `127.0.0.1`; it has no authentication.
-3. In a second terminal opened at the employee-engagement repository root, start the backend. Its local `.env` must point to `RAG_AGENT_URL=http://127.0.0.1:5000/ask`:
-   ```powershell
-   cd backend
-   npm run dev
-   ```
-4. In a third terminal opened at the employee-engagement repository root, start the frontend:
-   ```powershell
-   cd frontend
-   npm run dev
-   ```
-5. Open `http://127.0.0.1:5173/login` and sign in with an employee account. A useful smoke-test question for the checked-in handbook is: “How many paid time off days do employees receive per year?”
-
-**Production blockers in the upstream RAG-Agent source:** its `app.py` enables Flask debug mode and logs questions and captured subprocess output. The local demo checkout has debug disabled and those content logs removed, but those local-only changes are not part of this repository. Before deploying the upstream service, disable debug mode and redact/remove sensitive logs. The agent must also enforce service authentication, validate the question, and return structured source/relevance metadata if richer citations or confidence handling are required. No credentials were added to this repository.
-
-### Feedback (Employee)
-- `POST /api/feedback` - Submit new feedback with AI processing
-- `GET /api/feedback/my` - Get user's submitted feedback
-- `GET /api/feedback/my-with-replies` - Get feedback with HR replies and conversation messages
-- `POST /api/feedback/:id/messages` - Add a message to the feedback conversation; employees can access only their own feedback and HR administrators can respond to any feedback
-- `PUT /api/feedback/:id/read` - Mark feedback reply as read
-
-### Feedback (Admin)
-- `GET /api/feedback` - Get all feedback with advanced filtering
-- `PATCH /api/feedback/:id/status` - Update feedback status (open/closed/resolved)
-- `PATCH /api/feedback/:id/assignment` - Assign feedback to an HR admin or mark it unassigned
-- `DELETE /api/feedback/:id` - Delete feedback record
-- `POST /api/feedback/bulk-action` - Perform bulk operations on multiple feedback
-
-### Admin Management
-- `POST /api/admin/generate-ai-reply/:feedbackId` - Generate AI-powered reply
-- `GET /api/admin/replies/:feedbackId` - Get all replies for a feedback
-- `POST /api/admin/approve-reply/:replyId` - Approve and send reply to employee
-- `PATCH /api/admin/reply/:replyId` - Edit reply before approval
-- `DELETE /api/admin/reply/:replyId` - Delete draft reply
-
-### Scenario Management
-- `GET /api/admin/scenarios` - List all knowledge base scenarios
-- `POST /api/admin/scenarios` - Create new scenario
-- `PATCH /api/admin/scenarios/:id` - Update scenario with new responses
-- `DELETE /api/admin/scenarios/:id` - Delete scenario
-- `GET /api/admin/scenarios/search?query=` - Search scenarios by keywords
-
-### Unmatched Scenarios Review Queue
-- `GET /api/admin/unmatched-scenarios` - Get low-confidence chat messages for review
-- `POST /api/admin/scenarios/from-unmatched/:unmatchedId` - Convert review item to new scenario
-- `PATCH /api/admin/unmatched-scenarios/:id/reviewed` - Mark as reviewed
-
-### Analytics & Reporting
-- `GET /api/admin/stats` - Get engagement statistics and metrics
-- `GET /api/admin/audit` - List paginated administrator audit events (admin only)
-- `GET /api/admin/assignees` - List HR admins available for assignment
-- `GET /api/admin/assigned-feedback-count` - Count the signed-in admin's open assignments
-- `GET /api/admin/stats/feedback-by-category` - Feedback breakdown by category
-- `GET /api/admin/stats/response-time` - Average response time metrics
-- `GET /api/admin/stats/department-wise` - Department-based analytics
-- `GET /api/feedback/export.csv` - Download feedback as CSV (admin only; accepts the same filters as `GET /api/feedback`, and omits submitter identity for anonymous feedback)
-
-Feedback and chat-session list endpoints accept `page` and `limit` query parameters and return `items` plus pagination metadata. The server caps page size at 100.
-
-### Real-time Events (Socket.IO)
-- `chat:session-updated` - Chat session changed
-- `scenario:unmatched` - Scenario matching needs review
-- `notification` - Admin/employee notifications
-- `status-update` - Feedback status changed
-- `session-joined` - User joined session
-
-## Security Features
-
-- **Session Authentication**: MongoDB-backed sessions, HTTP-only cookies, and logout revocation
-- **CSRF Protection**: Session-bound tokens and frontend-origin validation for state-changing requests
-- **Password Security**: Bcrypt hashing with salt rounds
-- **Role-based Access Control**: Employee and Admin role separation
-- **Rate Limiting**: Protection against brute force and DDoS attacks on sensitive endpoints
-- **Input Validation**: Server-side validation of all user inputs
-- **Data Sanitization**: XSS prevention through input/output sanitization
-- **CORS Configuration**: Restricted cross-origin requests
-- **Helmet Security Headers**: HTTP security headers for preventing common attacks
-- **SQL Injection Prevention**: Parameterized queries with Mongoose
-- **Sensitive Data Protection**: Environment variables for secrets, no hardcoded credentials
-- **HTTPS Support**: Ready for SSL/TLS in production
-- **Session Management**: Secure session handling with timeout
-
-### Security Best Practices
-
-1. Never commit `.env` files to version control
-2. Regularly update dependencies for security patches
-3. Use a strong, private SESSION_SECRET in production
-4. Enable HTTPS in production deployments
-5. Implement proper error handling (don't leak stack traces)
-6. Use environment-specific configurations
-7. Regular security audits and penetration testing
-
-## Development
-
-### Local Development Environment
-
-- **Backend Server**: `http://localhost:5002`
-- **Frontend Application**: `http://localhost:5173`
-- **MongoDB**: Default port `27017` (local instance)
-- **Redis**: Default port `6379` (optional, for caching)
-- **Node.js**: v16+ recommended
-
-### Running the Full Stack
-
-Terminal 1 - Backend:
-```bash
-cd backend
+```powershell
 npm run dev
 ```
 
-Terminal 2 - Frontend:
-```bash
+The backend runs at `http://localhost:5002`.
+
+### 2. Configure and start the frontend
+
+In another terminal:
+
+```powershell
 cd frontend
+npm install
+Copy-Item .env.example .env
 npm run dev
 ```
 
-Terminal 3 - MongoDB:
-```bash
-mongod
-```
+Open `http://localhost:5173`. Vite proxies `/api` requests to the local backend. Public registration creates employee accounts; create administrators using the backend seed workflow.
 
-Terminal 4 - Redis (optional):
-```bash
-redis-server
-```
+### 3. Optional checks
 
-### Code Structure
-
-```
-backend/
-├── controllers/      # Request handlers for routes
-├── models/          # Mongoose schemas and models
-├── routes/          # API route definitions
-├── services/        # Business logic (AI, scenarios)
-├── middleware/      # Auth, error handling
-├── validators/      # Input validation schemas
-└── utils/           # Helper functions, DB connection
-
-frontend/
-├── components/      # Reusable React components
-├── pages/          # Full page components
-├── store/          # Redux state management
-├── services/       # API client and utilities
-├── styles/         # Tailwind CSS configuration
-└── utils/          # Helper functions
-```
-
-### Common Development Tasks
-
-**Adding a new API endpoint**:
-1. Create route in `backend/routes/`
-2. Add controller in `backend/controllers/`
-3. Add validation in `backend/validators/`
-4. Create integration tests in `backend/tests/`
-
-**Adding a new component**:
-1. Create component in `frontend/src/components/`
-2. Add component tests
-3. Integrate into appropriate page
-4. Update routing if needed
-
-**Running linting**:
-```bash
-npm run lint          # Check code style
-npm run lint:fix      # Auto-fix style issues
-```
-
-## Production Deployment
-
-### Pre-Deployment Checklist
-
-- [ ] All environment variables configured
-- [ ] Database backup strategy in place
-- [ ] SSL certificates obtained and configured
-- [ ] Rate limiting rules finalized
-- [ ] Email service credentials set up
-- [ ] Redis cluster configured (if using)
-- [ ] Logging and monitoring setup
-- [ ] Security audit completed
-
-### Deployment Steps
-
-1. **Build Frontend**:
-   ```bash
-   cd frontend
-   npm run dev
-   # Output in frontend/dist/
-   ```
-
-2. **Backend Configuration**:
-   - Set all production environment variables
-   - Configure production MongoDB connection string
-   - Set a strong, private SESSION_SECRET
-   - Enable HTTPS and SSL certificates
-
-3. **Serve Static Files**:
-   - Option A: Serve frontend dist from backend `/public` directory
-   - Option B: Use CDN for frontend assets
-   - Option C: Use reverse proxy (Nginx, Apache)
-
-4. **Database Preparation**:
-   - Backup existing MongoDB data
-   - Create production database indexes
-   - Run schema validation
-
-5. **Server Configuration**:
-   - Install PM2 for process management
-   ```bash
-   npm install -g pm2
-   pm2 start backend/server.js --name "engagement-api"
-   pm2 save
-   ```
-
-6. **Monitoring & Logging**:
-   - Configure Winston logging
-   - Set up error tracking (Sentry, etc.)
-   - Monitor resource usage
-   - Configure alerts for failures
-
-### Platform-Specific Deployment
-
-**AWS Deployment**:
-- Use Elastic Beanstalk for Node.js backend
-- RDS for MongoDB (or MongoDB Atlas)
-- CloudFront for static assets
-- Route 53 for DNS
-
-**Heroku Deployment**:
-- Push code to Heroku Git
-- Configure Heroku environment variables
-- Connect to MongoDB Atlas
-- Enable SSL through Heroku
-
-**Docker Deployment** (recommended):
-```bash
-docker build -t engagement-api .
-docker run -e NODE_ENV=production -p 5002:5002 engagement-api
-```
-
-### Post-Deployment Monitoring
-
-- Monitor API response times
-- Track error rates
-- Monitor database connection pool
-- Watch Redis cache hit rates
-- Review user engagement metrics
-- Regular security updates
-
-## Demonstration
-
-The presentation will be followed by a live demonstration of:
-
-- Software test cases executed covering unit, integration, and end-to-end scenarios
-- Project functionalities implemented from July 17 to August 30, 2026:
-  - Core feedback and chat system
-  - AI-powered response generation
-  - Admin management dashboard
-  - Scenario knowledge base with review queue
-  - Real-time analytics and metrics
-  - Enhanced validation and error handling
-  - Performance optimizations and caching
-
-## Testing
-
-### Test Coverage Overview
-
-Comprehensive testing has been implemented across all layers of the application to ensure reliability, security, and performance.
-
-### Unit Tests
-
-#### Backend Unit Tests
-- **Utilities Testing**:
-  - Validation functions for email, password strength, and feedback content
-  - Date utility functions for timestamp formatting and calculations
-  - Database connection helpers and retry logic
-
-- **Model Testing**:
-  - User model validation (email uniqueness, role constraints)
-  - Feedback model schema validation and state transitions
-  - Chat session model data integrity
-  - Reply and Scenario model validation
-
-- **Service Testing**:
-  - AI Service: API call mocking, response parsing, error handling
-  - Scenario Service: Similarity matching algorithms, fallback behavior
-  - Request/response transformation and data mapping
-
-#### Frontend Unit Tests
-- **Component Testing** (React Testing Library):
-  - LoginPage: Form validation, error messaging, navigation
-  - SignUpPage: Registration flow, password requirements
-  - HRKnowledgeAssistant: Conversation history, source references, and HR handoff
-  - FeedbackForm: Form submission, field validation, file uploads
-  - AdminDashboard: Data filtering, pagination, bulk operations
-  - StatsCards: Data rendering, metric calculations
-  - LoadingSpinner: Visibility toggling, accessibility
-
-- **Redux Store Testing**:
-  - authSlice: Login/logout state and session status
-  - feedbackSlice: Feedback list updates, filters, sorting
-  - State persistence and rehydration
-
-- **Utility Testing**:
-  - Axios interceptor configuration
-  - Date formatting and parsing
-  - Socket.IO event handlers
-
-### Integration Tests
-
-#### API Integration Tests
-- **Authentication Endpoints**:
-  - POST /api/auth/register - User registration with validation
-  - POST /api/auth/login - Login with server-side session creation
-  - GET /api/auth/profile - Protected route access verification
-  - Token expiration and refresh scenarios
-
-- **Feedback Endpoints**:
-  - POST /api/feedback - Feedback submission with AI processing
-  - GET /api/feedback/my - User-specific feedback retrieval
-  - GET /api/feedback - Admin feedback listing with filters
-  - PATCH /api/feedback/:id/status - Status update workflow
-  - DELETE /api/feedback/:id - Feedback deletion with cascading
-
-- **Chat Endpoints**:
-  - Real-time message handling via Socket.IO
-  - Chat session creation and persistence
-  - AI response generation and validation
-  - Escalation to HR workflow
-
-- **Admin Endpoints**:
-  - POST /api/admin/generate-ai-reply/:feedbackId - AI reply generation
-  - POST /api/admin/approve-reply/:replyId - Reply approval and sending
-  - GET /api/admin/stats - Analytics data aggregation
-  - GET /api/admin/scenarios - Scenario listing and filtering
-  - PATCH /api/admin/scenarios/:id - Scenario updates
-  - GET /api/admin/unmatched-scenarios - Review queue management
-
-#### Database Integration Tests
-- MongoDB transaction handling
-- Mongoose middleware execution (hooks)
-- Data consistency across related models
-- Index verification and query optimization
-- Connection pooling and reconnection handling
-
-### End-to-End Tests
-
-#### User Journey Tests
-- **Employee Flow**:
-  1. Registration → Login → Dashboard Access
-  2. Submit Feedback → Receive AI-generated Response → View Reply
-  3. Chat with AI → Escalate to HR → Track escalation status
-  4. View chat history and session details
-
-- **Admin Flow**:
-  1. Login as Admin → Dashboard Access
-  2. View all feedback → Filter by department/status
-  3. Generate AI reply → Review and approve → Send to employee
-  4. Manage scenarios → Review unmatched scenarios → Create new scenarios
-  5. Monitor analytics → Export reports
-
-- **Authentication Security**:
-  - Session and CSRF validation across requests
-  - Role-based access control enforcement
-  - Session timeout and renewal
-  - CORS and CSRF protection verification
-
-#### Real-time Features Testing
-- WebSocket connection establishment and maintenance
-- Real-time message delivery and acknowledgment
-- Session persistence across disconnections
-- Broadcast to multiple admin users
-
-### Performance Tests
-
-- **Load Testing**:
-  - Concurrent user feedback submissions
-  - Simultaneous chat sessions
-  - Admin dashboard with large feedback datasets
-  - API response time under load
-
-- **Caching Verification**:
-  - Scenario cache hit rates
-  - User session caching performance
-  - Redis key expiration
-
-- **Database Query Performance**:
-  - Index effectiveness
-  - Aggregation pipeline optimization
-  - Connection pool utilization
-
-### Security Tests
-
-- **Input Validation**:
-  - XSS prevention through sanitization
-  - SQL injection protection in queries
-  - File upload restrictions and scanning
-  - Rate limiting on sensitive endpoints
-
-- **Authentication & Authorization**:
-  - Session cookie validation and invalidation
-  - Token tampering detection
-  - Unauthorized access attempts
-  - Role-based permission enforcement
-
-- **Data Protection**:
-  - Password hashing verification (bcrypt)
-  - Sensitive data encryption
-  - CORS policy enforcement
-  - Helmet security headers validation
-
-### Test Execution
-
-#### Running Backend Tests
-```bash
+```powershell
 cd backend
-npm test                          # Run all tests
-npm run test:unit               # Unit tests only
-npm run test:integration        # Integration tests only
-npm run test:coverage           # Generate coverage report
+npm test
 ```
 
-#### Running Frontend Tests
-```bash
+For a production frontend build:
+
+```powershell
 cd frontend
-npm test                         # Run all tests
-npm run test:watch              # Watch mode for development
-npm run test:coverage           # Generate coverage report
+npm run build
 ```
 
-### Test Coverage Targets (as of Aug 30, 2026)
+## Environment configuration
 
-- **Backend Coverage**: 
-  - Controllers: 85%+
-  - Services: 90%+
-  - Models: 88%+
-  - Utilities: 95%+
-  - Overall: 87%
+Backend and frontend templates are maintained in `backend/.env.example` and `frontend/.env.example`. Values depend on the selected hosting environment. Common backend settings include:
 
-- **Frontend Coverage**:
-  - Components: 80%+
-  - Pages: 75%+
-  - Redux Slices: 85%+
-  - Utilities: 92%+
-  - Overall: 82%
+| Variable | Purpose |
+|---|---|
+| `MONGODB_URI` | MongoDB application database |
+| `SESSION_SECRET` | Secret used for server-side session security |
+| `SOCKET_TOKEN_SECRET` | Separate secret for realtime authentication |
+| `FRONTEND_URL` | Allowed frontend origin when frontend and API use separate origins |
+| `FEEDBACK_SLA_HOURS` | Feedback response target, from 1 to 720 hours |
+| `AI_PROVIDER`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL` | Optional feedback and admin AI configuration |
+| `RAG_AGENT_URL` and `RAG_AGENT_*` | Optional separate HR RAG service integration; production requires verified upstream authentication |
+| `REDIS_URL`, email settings | Optional services, when enabled by the deployment |
 
-### Continuous Integration
+Do not put server secrets in `VITE_*` variables. Do not enable production RAG access until the separate service is deployed over HTTPS, enforces authentication, and has safe logging configured.
 
-- Automated tests run on every commit
-- Pull request validation with test results
-- Coverage reports tracked over time
-- Performance regression detection
-- Security scanning in CI/CD pipeline
+## Deployment
+
+The repository includes `vercel.json` and `render.yaml`. Review the configuration and the hosting provider's current requirements before deployment. For Vercel, configure the required database URI and strong, distinct session and socket secrets in the project environment. Use Atlas networking and least-privilege database credentials. Configure optional AI, email, Redis, and RAG variables only when those services are available and secured.
+
+Provision the first administrator against the intended production database using the backend seed command and temporary environment variables. Verify `/api/health`, registration, sign-in, feedback workflows, administrator authorization, and realtime behavior after deployment. Never commit credentials or paste production secrets into project documentation.
+
+### HR knowledge assistant deployment boundary
+
+The HR knowledge assistant calls a separate Python RAG service. A local URL such as `127.0.0.1` points to the API runtime itself after deployment; it does not reach a developer computer. Keep RAG settings unset and verification disabled until the upstream is reachable over HTTPS and its authentication is actually enforced. The application must not be treated as having a live HR knowledge source until this integration is completed and verified.
+
+## Security notes
+
+- Keep `.env` files, database credentials, API keys, and reset passwords out of version control.
+- Use strong, unique secrets and production-only credentials.
+- Public signup creates employee accounts; administrator creation is a controlled backend operation.
+- Anonymous feedback responses and exports should not expose submitter identity.
+- Secure the separate RAG service itself; a backend verification flag does not add authentication to an unprotected upstream.
+
+## Project documentation
+
+See [UPDATE_LOG.md](UPDATE_LOG.md) for the dated implementation history, including the November 19 security, admin, feedback, and deployment updates.
+
+## Academic project note
+
+This repository is an educational major project demonstrating full-stack application development, database-backed workflows, access control, realtime communication, and integration with AI services. Optional or separately hosted integrations depend on valid configuration and should be identified clearly during evaluation.
 
 ## License
 
-This project is for educational and internal company use.
+For educational and internal project use.

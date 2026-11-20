@@ -100,3 +100,15 @@ This log records the employee dashboard and HR knowledge assistant changes made 
 - Documented that production employee RAG remains disabled until the separate RAG service is reachable over HTTPS and its authentication is implemented and verified.
 - Verified backend syntax and `git diff --check`. The Vite production build passed with the existing Browserslist age and bundle-size warnings. The frontend lint script is present but no ESLint configuration is available.
 - No services were deployed. Hosting still requires the user's Render, Vercel, and MongoDB Atlas projects, and a separately secured production RAG service.
+
+## 2026-11-19 - Security, administration, feedback, and deployment updates
+
+- Added backend CSRF protection, audit logging for administrator actions, privacy handling for anonymous feedback, CSV export, and pagination support.
+- Expanded administrator and employee workflows, including feedback management, chat-session oversight, HR knowledge assistant states, and dashboard navigation.
+- Added realtime event support and corresponding backend tests for security, AI usage, CSV export, pagination, and realtime behavior.
+- Updated API deployment configuration, frontend/backend environment examples, socket configuration, server routing, and project setup documentation for Vercel and Render.
+- Added and refined Vercel routing configuration and corrected API deployment behavior.
+- Revised the administrator password reset workflow and added dedicated reset-password tests. The operation requires explicit configuration and does not print the password.
+- Updated dependency manifests and removed tracked dependency installation files from `node_modules`.
+- `backend/.env` was changed and later removed in commits that day. Do not restore or document any secrets from that file; use `.env.example` templates and deployment secret stores.
+- The README now describes the application as a college major project and summarizes current setup, environment configuration, architecture, deployment, security, and the separate RAG-service boundary.
